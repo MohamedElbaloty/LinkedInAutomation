@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة نمو لينكد إن المؤتمتة | LinkedIn AI Growth Hub</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Dashboard Stylesheet -->
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <!-- Background Ambient Glows -->
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="app-container">
+        <!-- Top Navigation Header -->
+        <header class="app-header">
+            <div class="brand-area">
+                <div class="brand-logo">
+                    <span class="logo-icon">⚡</span>
+                </div>
+                <div class="brand-text">
+                    <h1 class="brand-title">LinkedIn AI Growth Hub</h1>
+                    <p class="brand-subtitle">نظام الأتمتة السحابي والنمو الأورجانيك لصنّاع المحتوى التقني</p>
+                </div>
+            </div>
+
+            <!-- System Health Badges -->
+            <div class="status-badges">
+                <div class="status-badge {{ 'badge-success' if is_linkedin_connected else 'badge-warning' }}" id="linkedin-status-badge">
+                    <span class="dot"></span>
+                    <span class="badge-label">{{ 'LinkedIn API: متصل وآمن' if is_linkedin_connected else 'LinkedIn: يتطلب الربط' }}</span>
+                </div>
+                <div class="status-badge badge-success">
+                    <span class="dot"></span>
+                    <span class="badge-label">Telegram Sync: نشط</span>
+                </div>
+                <div class="status-badge {{ 'badge-cloud' if is_railway else 'badge-local' }}">
+                    <span class="dot"></span>
+                    <span class="badge-label">{{ 'سيرفر Railway: أونلاين 24/7' if is_railway else 'بيئة العمل: Local Host' }}</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Actions Bar -->
+        <section class="hero-actions-card">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <div class="tag-pill">🚀 استراتيجية النمو الأورجانيك الفعالة</div>
+                    <h2 class="hero-title">نشر تلقائي مجدول بدون أي تدخل يدوي</h2>
+                    <p class="hero-desc">
+                        يقوم النظام باكتشاف أحدث أخبار الذكاء الاصطناعي العالمية فور حدوثها، صياغة منشورات احترافية بأسلوب كبار المعماريين، توليد إنفوجرافيك تقني فخم، ونشرها في مواعيد ذروة التفاعل.
+                    </p>
+                </div>
+                <div class="hero-cta">
+                    <button class="btn btn-primary btn-glow" id="btn-publish-now" onclick="triggerPublishNow()">
+                        <span class="btn-icon">⚡</span>
+                        <span class="btn-text">نشر الآن على LinkedIn (اختبار حي)</span>
+                    </button>
+                    <p class="cta-hint">يختبر الدورة الكاملة: جلب الخبر + تصميم الإنفوجرافيك + النشر المباشر</p>
+                </div>
+            </div>
+
+            <!-- Live Publishing Progress State (Hidden by default) -->
+            <div class="publish-progress-box" id="publish-progress-box" style="display: none;">
+                <div class="progress-header">
+                    <div class="spinner"></div>
+                    <span class="progress-title" id="progress-status-text">جاري فحص الخلاصات وجلب أحدث اختراق تقني...</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+                <div class="progress-steps">
+                    <span class="step active" id="step-1">1. جلب الخبر</span>
+                    <span class="step" id="step-2">2. الصياغة والتحليل</span>
+                    <span class="step" id="step-3">3. تصميم الإنفوجرافيك</span>
+                    <span class="step" id="step-4">4. النشر على LinkedIn</span>
+                </div>
+            </div>
+
+            <!-- Success Alert Banner -->
+            <div class="result-alert-box" id="result-alert-box" style="display: none;"></div>
+        </section>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Column: Scheduling & Strategy -->
+            <div class="grid-column">
+                <!-- Strategic Schedule Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-icon">⏱️</span>
+                            <h3 class="card-title">مواعيد النشر المجدولة (Organic Growth Slots)</h3>
+                        </div>
+                        <div class="switch-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="scheduler-toggle" {{ 'checked' if settings.enabled else '' }} onchange="toggleScheduler(this)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <p class="card-desc">
+                        الأوقات الذهبية الثلاثة المبرمجة تضمن وصول منشوراتك لأكبر عدد من المتابعين والمهندسين أثناء تصفحهم النشط:
+                    </p>
+
+                    <!-- Strategic Preset Buttons -->
+                    <div class="strategy-presets">
+                        <div class="preset-pill active" onclick="applyGrowthStrategy()">
+                            <span class="preset-name">🏆 استراتيجية النمو الثلاثية</span>
+                            <span class="preset-times">08:45 • 13:15 • 18:45</span>
+                        </div>
+                    </div>
+
+                    <!-- Active Time Slots Chips -->
+                    <div class="time-slots-container" id="time-slots-container">
+                        {% for t in settings.times %}
+                        <div class="time-chip" data-time="{{ t }}">
+                            <span class="time-value">{{ t }}</span>
+                            <button class="chip-remove" onclick="removeTimeSlot('{{ t }}')">×</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Add New Slot Form -->
+                    <div class="add-slot-row">
+                        <input type="time" id="new-slot-input" class="input-time" value="09:00">
+                        <button class="btn btn-secondary" onclick="addTimeSlot()">
+                            <span>+ إضافة موعد نشر</span>
+                        </button>
+                    </div>
+
+                    <div class="schedule-summary-box">
+                        <div class="summary-item">
+                            <span class="label">الموعد القادم للنشر:</span>
+                            <span class="value" id="next-run-display">جاري الحساب...</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="label">آخر منشور آلي:</span>
+                            <span class="value" id="last-run-display">{{ settings.last_run or 'لم يتم النشر بعد' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LinkedIn Account Safety Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-icon">🛡️</span>
+                            <h3 class="card-title">أمان الحساب وضمان عدم الحظر (Zero Ban Risk)</h3>
+                        </div>
+                    </div>
+                    <div class="security-info-box">
+                        <div class="sec-item">
+                            <span class="sec-check">✓</span>
+                            <div class="sec-text">
+                                <strong>Official LinkedIn Community Management API:</strong>
+                                <p>يتم النشر عبر واجهة LinkedIn REST الرسمية؛ لا خطر إطلاقاً من كشف الـ IP السحابي لـ Railway.</p>
+                            </div>
+                        </div>
+                        <div class="sec-item">
+                            <span class="sec-check">✓</span>
+                            <div class="sec-text">
+                                <strong>Smart Frequency Caps:</strong>
+                                <p>الالتزام بـ 2 إلى 3 منشورات نوعية يومياً كحد أقصى لحماية موثوقية الحساب وزيادة الوصول.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Token Config Accordion -->
+                    <div class="token-settings-block">
+                        <details class="token-details">
+                            <summary class="token-summary">⚙️ إعدادات ربط حساب LinkedIn (Access Token)</summary>
+                            <div class="token-form">
+                                <p class="token-help">أدخل الـ Access Token الرسمي الخاص بتطبيقك في LinkedIn Developer Portal:</p>
+                                <input type="password" id="linkedin-token-input" class="input-text" placeholder="AQV_... (OAuth Access Token)">
+                                <button class="btn btn-secondary" onclick="saveLinkedInToken()">حفظ وتأكيد الاتصال</button>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Live Queue & History -->
+            <div class="grid-column">
+                <!-- Live Queue Preview Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-icon">📰</span>
+                            <h3 class="card-title">قائمة الأخبار التقنية الجاهزة للنشر القادم</h3>
+                        </div>
+                        <button class="btn-refresh" onclick="refreshQueue()" title="تحديث الأخبار">🔄</button>
+                    </div>
+
+                    <div class="news-queue-list" id="news-queue-list">
+                        {% for item in unread %}
+                        <div class="queue-item">
+                            <div class="queue-meta">
+                                <span class="queue-source">{{ item.source }}</span>
+                                <span class="queue-score">🎯 نقاط الأهمية: {{ item.relevance_score }}</span>
+                            </div>
+                            <h4 class="queue-title">{{ item.title }}</h4>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">لا توجد مقالات غير مقروءة حالياً في الخلاصات.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Published History Archive -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-icon">📜</span>
+                            <h3 class="card-title">سجل المنشورات المنشورة حديثاً</h3>
+                        </div>
+                    </div>
+
+                    <div class="history-list" id="history-list">
+                        {% for post in history %}
+                        <div class="history-item">
+                            <div class="history-badge">تم النشر ✓</div>
+                            <div class="history-content">
+                                <h4 class="history-title">{{ post.title }}</h4>
+                                <span class="history-date">📅 {{ post.published_at }}</span>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">لم يتم تسجيل منشورات سابقة بعد. اضغط "نشر الآن" لبدء النشر الأول!</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>LinkedIn AI Organic Growth Hub • مصمم للعمل المستمر 24/7 على Railway مع Google Flow و Gemini 3</p>
+        </footer>
+    </div>
+
+    <!-- Dashboard Logic Script -->
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

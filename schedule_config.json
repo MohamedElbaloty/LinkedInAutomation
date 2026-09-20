@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "times": [
+    "08:45",
+    "13:15",
+    "18:45"
+  ],
+  "strategy": "Tech Organic Growth (3 Daily Windows)",
+  "last_run": null,
+  "next_run": null
+}

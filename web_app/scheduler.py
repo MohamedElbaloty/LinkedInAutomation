@@ -146,12 +146,12 @@ class GrowthSchedulerService:
             loop = asyncio.get_running_loop()
             bundle = await loop.run_in_executor(None, create_ai_bundle, article)
 
-            post_text = bundle["post_text"]
-            short_hook = bundle["short_hook"]
+            post_text = bundle.get("linkedin_post") or bundle.get("post_text", "")
+            telegram_caption = bundle.get("telegram_caption") or bundle.get("short_hook", "")
             image_path = Path(bundle["image_path"])
 
             # 2. Publish to LinkedIn (Safe official REST API or fallback)
-            logger.info("Publishing to LinkedIn...")
+            logger.info("Publishing in-depth article to LinkedIn (%d characters)...", len(post_text))
             try:
                 def _publish_lk():
                     return publish_article_to_linkedin_safe(post_text, image_path)
@@ -170,7 +170,7 @@ class GrowthSchedulerService:
                     from telegram.constants import ParseMode
 
                     bot = Bot(token=TELEGRAM_BOT_TOKEN)
-                    caption = f"🚀 **[LinkedIn Auto-Publish]**\n{short_hook or post_text[:900]}"
+                    caption = f"🚀 **[LinkedIn Auto-Publish]**\n{telegram_caption}"
                     if len(caption) > 1020:
                         caption = caption[:1017] + "..."
 

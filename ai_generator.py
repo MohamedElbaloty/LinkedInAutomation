@@ -26,12 +26,28 @@ class GenerationResult(BaseModel):
     short_hook: str = Field(
         description="A punchy 1-2 sentence hook in Arabic summarizing the breakthrough."
     )
-    post_text: str = Field(
-        description="Complete high-engagement LinkedIn post in technical Arabic with English tech terms, structured into Hook, 3-point Breakdown, CTA, and Hashtags. Keep the total length strictly under 1000 characters so it fits as a unified single Telegram photo caption."
+    linkedin_post: str = Field(
+        description=(
+            "A comprehensive, authoritative, and deeply detailed LinkedIn post in technical Arabic blended naturally with English technical terms. "
+            "Must be exhaustive and educational (between 1,500 and 2,500 characters) containing complete depth: "
+            "1. Bold curiosity-igniting opening hook. "
+            "2. Complete technical context and background (why this matters). "
+            "3. Deep architectural breakdown with 4 to 5 structured bullet points analyzing concrete mechanics under the hood (benchmarks, parameters, latency, compute economics, model routing, reasoning steps). "
+            "4. Practical engineering and business impact for software teams. "
+            "5. Strategic debate question for tech leaders in the comments. "
+            "6. Standard and contextual hashtags."
+        )
+    )
+    telegram_caption: str = Field(
+        description="A concise version of the news in Arabic (strictly under 950 characters) designed specifically as a single Telegram photo caption."
     )
     image_prompt: str = Field(
         description="A detailed English prompt for Google Flow's Nano Banana Pro model creating a professional LinkedIn tech infographic summarizing the news."
     )
+
+    @property
+    def post_text(self) -> str:
+        return self.linkedin_post
 
 
 class AIGenerator:
@@ -58,24 +74,24 @@ class AIGenerator:
             "CORE MISSION:\n"
             "You will be given a breaking AI news article. You must read it critically, grasp the underlying engineering and commercial significance, "
             "and produce:\n"
-            "1. An authoritative, viral LinkedIn post in clear, modern technical Arabic blended naturally with standard English technical terminology.\n"
-            "2. A bespoke, breathtaking editorial image prompt crafted specifically for Google's flagship Nano Banana Pro model.\n\n"
-            "POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS):\n"
-            "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through marketing noise. State what just fundamentally changed in the AI landscape.\n"
-            "- 🔬 Architectural Breakdown & Industry Implications: 3 to 4 structured, high-value bullet points analyzing the engineering mechanics under the hood "
-            "(e.g., test-time compute scaling, inference latency, KV cache footprint, reasoning vs fast token generation, MoE routing, agentic autonomy, hardware economics). "
-            "Explain what this means practically for teams building software today.\n"
+            "1. 'linkedin_post': An authoritative, viral, and deeply detailed LinkedIn post (1,500 to 2,500 characters) in clear, modern technical Arabic blended naturally with standard English technical terminology. Do NOT write a brief summary! Provide deep analysis, architectural breakdown, specific benchmarks, and actionable takeaways.\n"
+            "2. 'telegram_caption': A punchy, condensed version of the post (strictly under 950 characters) suitable as a single Telegram photo caption.\n"
+            "3. 'image_prompt': A bespoke editorial infographic prompt for Google's Nano Banana Pro model.\n\n"
+            "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
+            "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through marketing noise. State what just fundamentally changed.\n"
+            "- 🌍 Strategic Context: What was the limitation before, and what breakthrough was achieved?\n"
+            "- 🔬 Architectural Breakdown & Mechanics: 4 to 5 structured, high-value bullet points analyzing the engineering mechanics under the hood "
+            "(e.g., test-time compute scaling, inference latency, KV cache footprint, reasoning vs fast token generation, MoE routing, agentic autonomy, hardware economics, parameter counts, benchmark improvements). "
+            "Explain concrete numbers and details.\n"
+            "- 💼 Engineering & Business Implications: Explain what this means practically for teams building software today.\n"
             "- 💬 Provocative Discussion Question (CTA): A strategic architectural dilemma or trade-off question directed at tech leaders to drive insightful comment debates.\n"
             "- 🏷️ Hashtags: #AI #SoftwareEngineering #AgenticAI plus 2-3 specific tags relevant to the featured entities or topics.\n\n"
-            "IMAGE PROMPT DIRECTIVE (LINKEDIN TECHNICAL INFOGRAPHIC & VISUAL DESIGN FOR NANO BANANA PRO 🍌):\n"
-            "Your mission is to craft a bespoke English prompt for Google Flow's Nano Banana Pro model instructing it to create a professional LinkedIn tech infographic / visual design summarizing this exact news story.\n"
-            "- EXACT PROMPT STRUCTURE TO PRODUCE:\n"
-            "  * Command: 'Create a professional LinkedIn tech infographic and visual design about: [Exact News Headline / Breakthrough]'\n"
-            "  * News Summary: 'News Summary: [2 to 3 detailed, concrete sentences summarizing the exact news event, key entities involved, and technical/market implications]'\n"
-            "  * Structured Visual Sections: 'Visual Layout: [Describe 3 structured concept cards, diagrams, or comparison blocks visualizing the key aspects of the summary]'\n"
-            "  * Design Aesthetics: 'Design Style: Sleek modern corporate tech design for LinkedIn, clean visual hierarchy, data visualization cards, elegant modern typography, high-contrast dark slate aesthetic with glowing accent indicators, premium presentation slide layout, 16:9 widescreen composition.'\n"
-            "- CRITICAL RULE:\n"
-            "  * Ensure the prompt gives Flow the complete, informative summary of the news so the generated visual communicates the exact news story to LinkedIn professionals."
+            "IMAGE PROMPT DIRECTIVE (LINKEDIN TECHNICAL INFOGRAPHIC FOR NANO BANANA PRO 🍌):\n"
+            "Craft a bespoke English prompt for Google Flow's Nano Banana Pro model instructing it to create a professional LinkedIn tech infographic:\n"
+            "- Command: 'Create a professional LinkedIn tech infographic and visual design about: [Exact News Headline / Breakthrough]'\n"
+            "- News Summary: 'News Summary: [2 to 3 detailed, concrete sentences summarizing the exact news event and technical implications]'\n"
+            "- Structured Visual Sections: 'Visual Layout: [Describe 3 structured concept cards, diagrams, or comparison blocks visualizing the key aspects]'\n"
+            "- Design Aesthetics: 'Design Style: Sleek modern corporate tech design for LinkedIn, clean visual hierarchy, data visualization cards, elegant modern typography, high-contrast dark slate aesthetic with glowing accent indicators, premium presentation slide layout, 16:9 widescreen composition.'\n"
         )
 
         user_content = (
@@ -287,7 +303,9 @@ def create_ai_bundle(article: Article) -> Dict[str, any]:
     return {
         "article": article,
         "short_hook": content_result.short_hook,
-        "post_text": content_result.post_text,
+        "post_text": content_result.linkedin_post,
+        "linkedin_post": content_result.linkedin_post,
+        "telegram_caption": content_result.telegram_caption,
         "image_prompt": content_result.image_prompt,
         "image_path": image_path,
     }

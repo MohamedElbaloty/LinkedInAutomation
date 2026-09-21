@@ -303,9 +303,55 @@ def fetch_unread_articles(feeds: Optional[List[dict]] = None, db_path: Path = DB
     return candidates
 
 
+def enrich_article_content(article: Article) -> Article:
+    """
+    Fetches the full web page text if the RSS summary is brief (< 500 chars)
+    to give Gemini deep technical context for comprehensive LinkedIn breakdowns.
+    """
+    if not article.link:
+        return article
+
+    if len(article.summary) >= 600:
+        return article
+
+    try:
+        import requests
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        resp = requests.get(article.link, headers=headers, timeout=8)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for tag in soup(["script", "style", "nav", "header", "footer", "aside", "form"]):
+                tag.decompose()
+
+            main_container = (
+                soup.find("article")
+                or soup.find("main")
+                or soup.find("div", class_=re.compile(r"article|content|post-body|entry-content", re.I))
+                or soup
+            )
+            paragraphs = main_container.find_all("p")
+            text_chunks = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 35]
+            if text_chunks:
+                full_body = " ".join(text_chunks[:12])
+                if len(full_body) > len(article.summary):
+                    article.summary = full_body[:3500]
+                    logger.info("Enriched article content for '%s' (%d characters extracted)", article.title, len(article.summary))
+    except Exception as e:
+        logger.debug("Could not enrich article content for %s: %s", article.link, e)
+
+    return article
+
+
 def get_latest_unread_article(feeds: Optional[List[dict]] = None, db_path: Path = DB_PATH) -> Optional[Article]:
     """
-    Fetches the highest-relevance unread article.
+    Fetches the highest-relevance unread article and enriches it with full body text.
     Does NOT mark it as posted yet (orchestrator should mark it upon successful delivery).
     """
     unread = fetch_unread_articles(feeds=feeds, db_path=db_path)
@@ -314,10 +360,14 @@ def get_latest_unread_article(feeds: Optional[List[dict]] = None, db_path: Path 
         return None
 
     selected = unread[0]
+    # Enrich with full web page context
+    selected = enrich_article_content(selected)
     logger.info(
-        "Selected article: '%s' from %s (Score: %d)",
+        "Selected article: '%s' from %s (Score: %d, Summary len: %d)",
         selected.title,
         selected.source,
         selected.relevance_score,
+        len(selected.summary),
     )
     return selected
+

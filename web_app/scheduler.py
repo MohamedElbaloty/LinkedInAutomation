@@ -6,6 +6,7 @@ Manages strategic LinkedIn organic growth posting windows (08:45, 13:15, 18:45).
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -21,6 +22,7 @@ from linkedin_api import publish_article_to_linkedin_safe
 logger = logging.getLogger(__name__)
 
 SCHEDULE_CONFIG_FILE = BASE_DIR / "schedule_config.json"
+TIMEZONE_STR = os.getenv("TIMEZONE", "Africa/Cairo").strip() or "Africa/Cairo"
 
 
 def load_schedule_settings() -> Dict[str, any]:
@@ -92,12 +94,12 @@ class GrowthSchedulerService:
                 job_id = f"linkedin_post_{hour:02d}_{minute:02d}"
                 self.scheduler.add_job(
                     self.execute_pipeline_job,
-                    trigger=CronTrigger(hour=hour, minute=minute),
+                    trigger=CronTrigger(hour=hour, minute=minute, timezone=TIMEZONE_STR),
                     id=job_id,
                     replace_existing=True,
-                    name=f"LinkedIn Organic Post at {t}",
+                    name=f"LinkedIn Organic Post at {t} ({TIMEZONE_STR})",
                 )
-                logger.info("Registered scheduled job: %s at %02d:%02d UTC/Local", job_id, hour, minute)
+                logger.info("Registered scheduled job: %s at %02d:%02d (%s timezone)", job_id, hour, minute, TIMEZONE_STR)
             except Exception as e:
                 logger.error("Failed to register job for time '%s': %s", t, e)
 

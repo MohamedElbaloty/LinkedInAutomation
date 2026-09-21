@@ -130,6 +130,7 @@ async def get_status():
 
     return {
         "status": "online",
+        "version": "v2.2-deep-breakdown",
         "timestamp": datetime.now().isoformat(),
         "scheduler_enabled": settings.get("enabled", True),
         "schedule_times": settings.get("times", DEFAULT_SCHEDULE_TIMES),

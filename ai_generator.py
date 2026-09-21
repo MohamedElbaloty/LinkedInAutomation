@@ -246,9 +246,12 @@ class AIGenerator:
         filename = f"{article_id[:16]}.jpg"
         target_path = output_dir / filename
 
+        from image_watermark import stamp_author_branding
+
         # 1. Absolute First Priority: True Google Flow Pro 'Nano Banana Pro 🍌' model
         try:
-            return self._generate_gflow_image(prompt, target_path)
+            raw_path = self._generate_gflow_image(prompt, target_path)
+            return stamp_author_branding(raw_path)
         except Exception as e:
             logger.warning("Google Flow Nano Banana Pro generation failed: %s. Falling back to Google GenAI API...", str(e)[:150])
 
@@ -278,17 +281,19 @@ class AIGenerator:
                             img = Image.open(io.BytesIO(part.inline_data.data))
                             img.save(target_path, format="JPEG", quality=95)
                             logger.info("Google Studio image successfully saved to %s (size: %s)", target_path, img.size)
-                            return target_path
+                            return stamp_author_branding(target_path)
             except Exception as e:
                 logger.warning("Generation with %s encountered an issue: %s", model_name, str(e)[:150])
                 continue
 
         # If Google models fail, use FLUX.1
         try:
-            return self._generate_flux_image(prompt, target_path)
+            raw_path = self._generate_flux_image(prompt, target_path)
+            return stamp_author_branding(raw_path)
         except Exception as e:
             logger.warning("FLUX.1 generation encountered an issue (%s). Falling back to graphic.", str(e))
-            return self._generate_fallback_image(prompt, target_path)
+            raw_path = self._generate_fallback_image(prompt, target_path)
+            return stamp_author_branding(raw_path)
 
 
 def create_ai_bundle(article: Article) -> Dict[str, any]:

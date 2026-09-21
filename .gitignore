@@ -40,6 +40,8 @@ chrome_profile/
 *.webp
 output_images/*
 !output_images/.gitkeep
+!assets/*
+!assets/author_avatar.jpg
 
 # SQLite database (will be created automatically at runtime)
 news_history.db

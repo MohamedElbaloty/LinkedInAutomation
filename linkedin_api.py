@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 from typing import Dict, List, Optional, Tuple
 import requests
 
@@ -63,6 +64,24 @@ def get_candidate_versions() -> List[str]:
 
 # Cached working version across requests
 _ACTIVE_LINKEDIN_VERSION: str = os.getenv("LINKEDIN_API_VERSION", "202608")
+
+# Regex to match reserved LinkedIn Little Text markup characters that cause silent post truncation:
+# \ | { } @ [ ] ( ) < > and isolated underscores (preserving hashtags like #Machine_Learning)
+LINKEDIN_LITTLE_TEXT_ESCAPE_RE = re.compile(r"([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))")
+
+
+def escape_linkedin_commentary(text: str) -> str:
+    """
+    Escapes reserved 'Little Text' markup characters in LinkedIn commentary.
+    In LinkedIn /rest/posts, unescaped characters like (, ), [, ], {, }, <, >, |, @, \\
+    are parsed as entity mention or link markup. When invalid, LinkedIn silently truncates
+    the commentary text from that character onwards.
+    """
+    if not text:
+        return ""
+    # Normalize existing escapes to avoid double-escaping
+    cleaned = re.sub(r"\\([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))", r"\1", text)
+    return LINKEDIN_LITTLE_TEXT_ESCAPE_RE.sub(r"\\\1", cleaned)
 
 
 class LinkedInAPIClient:
@@ -226,10 +245,17 @@ class LinkedInAPIClient:
         if not self.person_urn:
             self.fetch_my_profile_urn()
 
+        escaped_commentary = escape_linkedin_commentary(post_text)
+        logger.info(
+            "Prepared commentary for LinkedIn API (Original: %d chars, Escaped: %d chars)",
+            len(post_text),
+            len(escaped_commentary),
+        )
+
         url = f"{LINKEDIN_API_BASE}/rest/posts"
         payload = {
             "author": self.person_urn,
-            "commentary": post_text,
+            "commentary": escaped_commentary,
             "visibility": "PUBLIC",
             "distribution": {
                 "feedDistribution": "MAIN_FEED",

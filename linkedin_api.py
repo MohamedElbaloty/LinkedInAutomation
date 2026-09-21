@@ -1,14 +1,15 @@
 """
 Official LinkedIn REST API Client for Safe, Zero-Ban Cloud Publishing.
-Uses LinkedIn OAuth 2.0 and Community Management / Posts API (LinkedIn Version 202401+).
+Uses LinkedIn OAuth 2.0 and Community Management / Posts API with dynamic version negotiation.
 100% compliant with LinkedIn Terms of Service, safe for cloud deployment on Railway/AWS.
 """
 
+from datetime import datetime
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import requests
 
 from config import (
@@ -23,21 +24,61 @@ logger = logging.getLogger(__name__)
 
 LINKEDIN_API_BASE = "https://api.linkedin.com"
 LINKEDIN_OAUTH_BASE = "https://www.linkedin.com/oauth/v2"
-LINKEDIN_API_VERSION = "202401"
+
+
+def get_candidate_versions() -> List[str]:
+    """
+    Generates a prioritized list of LinkedIn API versions (YYYYMM) within the supported window.
+    LinkedIn releases monthly versions and accepts any active version (typically rolling 12 months).
+    """
+    candidates: List[str] = []
+    env_ver = os.getenv("LINKEDIN_API_VERSION", "").strip()
+    if env_ver:
+        candidates.append(env_ver)
+
+    # Candidate months from current going back 24 months
+    now = datetime.now()
+    for offset in range(0, 24):
+        y = now.year
+        m = now.month - offset
+        while m <= 0:
+            m += 12
+            y -= 1
+        ver = f"{y:04d}{m:02d}"
+        if ver not in candidates:
+            candidates.append(ver)
+
+    # Known stable fallbacks
+    fallbacks = [
+        "202608", "202607", "202606", "202605", "202604", "202603", "202602", "202601",
+        "202512", "202511", "202510", "202509", "202508", "202507", "202506", "202505",
+        "202504", "202503", "202502", "202501", "202412", "202411", "202410", "202409",
+    ]
+    for fb in fallbacks:
+        if fb not in candidates:
+            candidates.append(fb)
+
+    return candidates
+
+
+# Cached working version across requests
+_ACTIVE_LINKEDIN_VERSION: str = os.getenv("LINKEDIN_API_VERSION", "202608")
 
 
 class LinkedInAPIClient:
-    """Official LinkedIn REST API Client."""
+    """Official LinkedIn REST API Client with automatic version negotiation."""
 
     def __init__(
         self,
         access_token: Optional[str] = None,
         person_urn: Optional[str] = None,
     ):
+        global _ACTIVE_LINKEDIN_VERSION
         self.access_token = (access_token or LINKEDIN_ACCESS_TOKEN).strip()
         self.person_urn = (person_urn or LINKEDIN_PERSON_URN).strip()
         self.client_id = LINKEDIN_CLIENT_ID.strip()
         self.client_secret = LINKEDIN_CLIENT_SECRET.strip()
+        self.api_version = _ACTIVE_LINKEDIN_VERSION
 
     def get_authorization_url(self, redirect_uri: str) -> str:
         """Generates the official LinkedIn OAuth 2.0 authorization URL."""
@@ -68,16 +109,54 @@ class LinkedInAPIClient:
         self.access_token = token_data.get("access_token", "")
         return token_data
 
-    def get_headers(self) -> Dict[str, str]:
+    def get_headers(self, version: Optional[str] = None) -> Dict[str, str]:
         """Standard headers for LinkedIn REST API requests."""
         if not self.access_token:
             raise ValueError("LinkedIn Access Token is missing. Connect your account first.")
+        ver = version or self.api_version
         return {
             "Authorization": f"Bearer {self.access_token}",
-            "LinkedIn-Version": LINKEDIN_API_VERSION,
+            "LinkedIn-Version": ver,
             "X-Restli-Protocol-Version": "2.0.0",
             "Content-Type": "application/json",
         }
+
+    def _request_with_version_retry(self, method: str, url: str, **kwargs) -> requests.Response:
+        """
+        Sends an HTTP request, automatically negotiating LinkedIn-Version if a 426 NONEXISTENT_VERSION occurs.
+        """
+        global _ACTIVE_LINKEDIN_VERSION
+        candidates = get_candidate_versions()
+        if self.api_version in candidates:
+            candidates.remove(self.api_version)
+        candidates.insert(0, self.api_version)
+
+        last_resp = None
+        for ver in candidates:
+            headers = self.get_headers(version=ver)
+            if "headers" in kwargs:
+                merged = {**headers, **kwargs["headers"]}
+            else:
+                merged = headers
+
+            req_kwargs = {**kwargs, "headers": merged}
+            resp = requests.request(method, url, **req_kwargs)
+            last_resp = resp
+
+            # 426 indicates deprecated or non-existent version header
+            if resp.status_code == 426 and "NONEXISTENT_VERSION" in resp.text:
+                logger.debug("LinkedIn-Version %s returned 426 NONEXISTENT_VERSION. Trying next candidate...", ver)
+                continue
+
+            # Accepted or valid response
+            if resp.status_code in (200, 201, 204):
+                if self.api_version != ver:
+                    logger.info("Negotiated active LinkedIn API version: %s", ver)
+                    self.api_version = ver
+                    _ACTIVE_LINKEDIN_VERSION = ver
+            return resp
+
+        return last_resp
 
     def fetch_my_profile_urn(self) -> str:
         """Fetches the authenticated member's URN using the UserInfo endpoint."""
@@ -113,8 +192,7 @@ class LinkedInAPIClient:
                 "owner": self.person_urn
             }
         }
-        headers = self.get_headers()
-        resp = requests.post(init_url, json=init_payload, headers=headers, timeout=20)
+        resp = self._request_with_version_retry("POST", init_url, json=init_payload, timeout=20)
         if resp.status_code not in (200, 201):
             raise RuntimeError(f"Failed to initialize image upload: {resp.status_code} - {resp.text}")
 
@@ -149,8 +227,6 @@ class LinkedInAPIClient:
             self.fetch_my_profile_urn()
 
         url = f"{LINKEDIN_API_BASE}/rest/posts"
-        headers = self.get_headers()
-
         payload = {
             "author": self.person_urn,
             "commentary": post_text,
@@ -166,20 +242,22 @@ class LinkedInAPIClient:
 
         # Attach image if provided
         if image_path and Path(image_path).exists():
-            image_urn = self.upload_image(Path(image_path))
-            payload["content"] = {
-                "media": {
-                    "id": image_urn,
-                    "title": "AI Technology Architecture & Engineering Analysis"
+            try:
+                image_urn = self.upload_image(Path(image_path))
+                payload["content"] = {
+                    "media": {
+                        "id": image_urn,
+                        "title": "AI Technology Architecture & Engineering Analysis"
+                    }
                 }
-            }
+            except Exception as img_err:
+                logger.warning("Image attachment could not be uploaded (%s). Publishing high-impact text post.", img_err)
 
-        resp = requests.post(url, json=payload, headers=headers, timeout=25)
+        resp = self._request_with_version_retry("POST", url, json=payload, timeout=25)
         if resp.status_code not in (200, 201):
             raise RuntimeError(f"Failed to create post on LinkedIn: {resp.status_code} - {resp.text}")
 
         post_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
-        # Clean post URN
         public_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else "https://www.linkedin.com/feed/"
         logger.info("Post published successfully on LinkedIn! URN: %s", post_urn)
 
@@ -195,11 +273,18 @@ def publish_article_to_linkedin_safe(post_text: str, image_path: Optional[Path] 
     """
     Unified entry point for publishing to LinkedIn.
     1. If official API token is configured -> Uses official 100% safe REST API.
-    2. If local browser profile exists -> Falls back to local Playwright session.
+    2. If local browser profile exists -> Falls back to local Playwright session (Local ONLY).
     3. Returns dict with status, method, and URL.
     """
-    # 1. First priority: Official REST API (Safe for Cloud & Railway)
     token = os.getenv("LINKEDIN_ACCESS_TOKEN", "").strip() or LINKEDIN_ACCESS_TOKEN
+    is_cloud = bool(
+        os.getenv("RAILWAY_ENVIRONMENT")
+        or os.getenv("RAILWAY_STATIC_URL")
+        or os.getenv("DYNO")
+        or os.getenv("KUBERNETES_SERVICE_HOST")
+    )
+
+    # 1. First priority: Official REST API (Safe for Cloud & Railway)
     if token:
         try:
             logger.info("Using Official LinkedIn REST API for publishing...")
@@ -207,24 +292,32 @@ def publish_article_to_linkedin_safe(post_text: str, image_path: Optional[Path] 
             return client.create_post(post_text, image_path)
         except Exception as api_err:
             logger.error("Official LinkedIn API publish failed: %s", api_err)
-            # Continue to fallback
+            if is_cloud:
+                return {
+                    "success": False,
+                    "error": f"LinkedIn API Error: {str(api_err)}",
+                    "method": "official_api",
+                }
 
-    # 2. Second priority: Local Browser Session (Safe on local residential IP)
-    from linkedin_publisher import LINKEDIN_PROFILE_DIR, publish_to_linkedin
-    if LINKEDIN_PROFILE_DIR.exists() and not os.getenv("RAILWAY_ENVIRONMENT"):
+    # 2. Second priority: Local Browser Session (ONLY locally on residential IP)
+    if not is_cloud:
         try:
-            logger.info("Using Local LinkedIn browser session for publishing...")
-            success = publish_to_linkedin(post_text, image_path)
-            return {
-                "success": success,
-                "post_urn": "browser_session",
-                "public_url": "https://www.linkedin.com/in/me/recent-activity/all/",
-                "method": "browser_session",
-            }
+            from linkedin_publisher import LINKEDIN_PROFILE_DIR, publish_to_linkedin
+            if LINKEDIN_PROFILE_DIR.exists():
+                logger.info("Using Local LinkedIn browser session for publishing...")
+                success = publish_to_linkedin(post_text, image_path)
+                return {
+                    "success": success,
+                    "post_urn": "browser_session",
+                    "public_url": "https://www.linkedin.com/in/me/recent-activity/all/",
+                    "method": "browser_session",
+                }
+        except ImportError:
+            logger.info("Playwright is not installed in environment. Skipping local browser fallback.")
         except Exception as browser_err:
             logger.error("Browser session publish failed: %s", browser_err)
 
-    # 3. If neither is available, return detailed instructional error
+    # 3. If neither is available, return clean error
     return {
         "success": False,
         "error": (

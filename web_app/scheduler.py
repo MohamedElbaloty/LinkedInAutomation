@@ -152,12 +152,16 @@ class GrowthSchedulerService:
 
             # 2. Publish to LinkedIn (Safe official REST API or fallback)
             logger.info("Publishing to LinkedIn...")
-            def _publish_lk():
-                return publish_article_to_linkedin_safe(post_text, image_path)
+            try:
+                def _publish_lk():
+                    return publish_article_to_linkedin_safe(post_text, image_path)
 
-            linkedin_res = await loop.run_in_executor(None, _publish_lk)
-            result["linkedin"] = linkedin_res
-            logger.info("LinkedIn publishing result: %s", linkedin_res)
+                linkedin_res = await loop.run_in_executor(None, _publish_lk)
+                result["linkedin"] = linkedin_res
+                logger.info("LinkedIn publishing result: %s", linkedin_res)
+            except Exception as lk_exc:
+                logger.error("LinkedIn publish step failed: %s", lk_exc)
+                result["linkedin"] = {"success": False, "error": str(lk_exc)}
 
             # 3. Deliver to Telegram channel / chat as unified post
             if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:

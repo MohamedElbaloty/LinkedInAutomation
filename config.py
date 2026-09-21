@@ -45,29 +45,47 @@ DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "news_history.db").strip()
 IMAGES_DIR: Path = BASE_DIR / os.getenv("IMAGES_DIR", "output_images").strip()
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
-# Curated High-Quality AI RSS Feeds
+# Curated High-Quality Saudi, GCC & Global Tech Feeds (FinTech, PropTech, AI)
 AI_RSS_FEEDS: List[dict] = [
     {
-        "name": "TechCrunch AI",
+        "name": "Wamda Startups & VC",
+        "url": "https://www.wamda.com/feed",
+        "category": "Startups & Funding",
+    },
+    {
+        "name": "Fintech News Middle East",
+        "url": "https://fintechnews.ae/feed/",
+        "category": "Fintech & Banking",
+    },
+    {
+        "name": "Saudi & GCC FinTech Pulse",
+        "url": "https://news.google.com/rss/search?q=(Saudi+OR+GCC+OR+UAE)+(Fintech+OR+Proptech)&hl=en-US&gl=US&ceid=US:en",
+        "category": "Fintech & Proptech",
+    },
+    {
+        "name": "Saudi PropTech & Real Estate Tech",
+        "url": "https://news.google.com/rss/search?q=(Saudi+Arabia+Proptech)+OR+(Saudi+Real+Estate+tech)+OR+(ROSHN+technology)&hl=en-US&gl=US&ceid=US:en",
+        "category": "Proptech",
+    },
+    {
+        "name": "SAMA & Saudi Banking Innovations",
+        "url": "https://news.google.com/rss/search?q=(Saudi+Fintech)+OR+(SAMA+Open+Banking)+OR+(Saudi+payments)&hl=en-US&gl=US&ceid=US:en",
+        "category": "Fintech Regulations",
+    },
+    {
+        "name": "TechCrunch AI & Enterprise",
         "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "category": "AI Technology",
     },
     {
         "name": "VentureBeat AI",
         "url": "https://venturebeat.com/category/ai/feed/",
-    },
-    {
-        "name": "The Verge AI",
-        "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-    },
-    {
-        "name": "MIT Technology Review AI",
-        "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/",
-    },
-    {
-        "name": "Google News AI",
-        "url": "https://news.google.com/rss/search?q=Artificial+Intelligence&hl=en-US&gl=US&ceid=US:en",
+        "category": "AI Technology",
     },
 ]
+
+# Backward compatibility alias
+TECH_RSS_FEEDS = AI_RSS_FEEDS
 
 # Scheduler execution hours (24-hour format)
 _schedule_raw = os.getenv("SCHEDULE_HOURS", "9,18")

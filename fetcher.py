@@ -54,52 +54,102 @@ AI_KEYWORDS = [
     "open-source ai",
 ]
 
-# Keywords that indicate non-technical stock market noise / financial clickbait
-NEGATIVE_KEYWORDS = [
-    "stock",
-    "stocks",
-    "shares",
-    "shareholder",
-    "investor",
-    "investing",
-    "motley fool",
-    "dividend",
-    "market cap",
-    "earnings",
-    "wall street",
-    "nasdaq",
-    "buy now",
-    "price target",
-    "portfolio",
-    "berkshire",
-    "10x",
+# Keywords for detecting FinTech & PropTech breakthroughs
+FINTECH_PROPTECH_KEYWORDS = [
+    "fintech",
+    "proptech",
+    "open banking",
+    "digital banking",
+    "digital bank",
+    "payments",
+    "payment gateway",
+    "digital wallet",
+    "bnpl",
+    "buy now pay later",
+    "sama",
+    "saudi central bank",
+    "real estate",
+    "real estate tech",
+    "property technology",
+    "smart building",
+    "smart cities",
+    "tokenization",
+    "fractional ownership",
+    "digital escrow",
+    "credit scoring",
+    "automated valuation",
+    "avm",
+    "seed round",
+    "funding round",
+    "series a",
+    "series b",
+    "pre-seed",
+    "venture capital",
+    "fintech saudi",
 ]
 
-# Technical & algorithmic keywords that indicate suitability for Deep Manim breakdown
-DEEP_MANIM_KEYWORDS = [
+# Priority geographic keywords for Saudi Arabia and the GCC
+GCC_PRIORITY_KEYWORDS = [
+    "saudi",
+    "saudi arabia",
+    "riyadh",
+    "jeddah",
+    "gcc",
+    "gulf",
+    "uae",
+    "dubai",
+    "abu dhabi",
+    "qatar",
+    "kuwait",
+    "bahrain",
+    "oman",
+    "roshn",
+    "neom",
+    "red sea",
+    "cityscape",
+    "vision 2030",
+]
+
+# Keywords that indicate non-technical penny-stock clickbait
+NEGATIVE_KEYWORDS = [
+    "motley fool",
+    "penny stock",
+    "penny stocks",
+    "day trading",
+    "strong buy",
+    "price target",
+    "dividend yield",
+    "berkshire",
+    "10x stock",
+    "top stock to buy",
+]
+
+# Technical, algorithmic, and financial architecture keywords
+TECHNICAL_KEYWORDS = [
     "architecture",
+    "api",
+    "apis",
+    "infrastructure",
+    "pipeline",
     "transformer",
     "reasoning",
-    "weights",
     "algorithm",
     "tensors",
     "vectors",
-    "calibration",
     "moe",
     "mixture of experts",
     "diffusion",
-    "rlhf",
-    "attention",
-    "latent",
     "kv cache",
     "quantization",
-    "state space",
-    "mamba",
-    "loss function",
-    "forward pass",
     "tokens",
     "mechanics",
+    "latency",
+    "throughput",
+    "protocols",
+    "consensus",
+    "security",
 ]
+DEEP_MANIM_KEYWORDS = TECHNICAL_KEYWORDS
 
 
 @dataclass
@@ -185,36 +235,66 @@ def clean_html(raw_html: str) -> str:
 
 def calculate_relevance(title: str, summary: str) -> int:
     """
-    Scores the relevance of an article to AI topics.
-    Excludes stock/financial clickbait and strongly boosts technical topics
-    suitable for Deep Manim mathematical/architectural explanations.
+    Scores the relevance of an article across Saudi/GCC FinTech, PropTech, and AI topics.
+    Gives priority weighting to Saudi Arabia and GCC market developments, open banking,
+    proptech platforms, and technical architecture while eliminating spammy penny-stock noise.
     """
     title_lower = title.lower()
     summary_lower = summary.lower()
     full_text = f"{title_lower} {summary_lower}"
 
-    # 1. Filter out financial / stock market noise
+    # 1. Filter out spammy penny-stock clickbait
     for neg in NEGATIVE_KEYWORDS:
         pattern = r"\b" + re.escape(neg) + r"\b"
         if re.search(pattern, title_lower):
-            return -100  # Immediately disqualify stock picks
+            return -100
 
-    # 2. Score standard AI keywords
     score = 0
+    has_gcc = False
+    has_fin_prop = False
+    has_ai = False
+
+    # 2. Check GCC & Saudi priority
+    for kw in GCC_PRIORITY_KEYWORDS:
+        pattern = r"\b" + re.escape(kw) + r"\b"
+        if re.search(pattern, title_lower):
+            score += 10
+            has_gcc = True
+        elif re.search(pattern, summary_lower):
+            score += 5
+            has_gcc = True
+
+    # 3. Check FinTech & PropTech domain
+    for kw in FINTECH_PROPTECH_KEYWORDS:
+        pattern = r"\b" + re.escape(kw) + r"\b"
+        if re.search(pattern, title_lower):
+            score += 8
+            has_fin_prop = True
+        elif re.search(pattern, summary_lower):
+            score += 4
+            has_fin_prop = True
+
+    # 4. Check AI topics
     for kw in AI_KEYWORDS:
         pattern = r"\b" + re.escape(kw) + r"\b"
         if re.search(pattern, title_lower):
-            score += 3
+            score += 5
+            has_ai = True
         elif re.search(pattern, summary_lower):
-            score += 1
+            score += 2
+            has_ai = True
 
-    # 3. Heavily boost Deep Manim technical & architectural terms
-    for tech in DEEP_MANIM_KEYWORDS:
+    # 5. Technical architecture keywords
+    for tech in TECHNICAL_KEYWORDS:
         pattern = r"\b" + re.escape(tech) + r"\b"
         if re.search(pattern, title_lower):
-            score += 10
+            score += 6
         elif re.search(pattern, summary_lower):
-            score += 4
+            score += 3
+
+    # Synergy bonus: If Saudi/GCC intersects with FinTech, PropTech, or AI -> highest priority
+    if has_gcc and (has_fin_prop or has_ai):
+        score += 20
 
     return score
 

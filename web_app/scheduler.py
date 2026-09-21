@@ -151,7 +151,8 @@ class GrowthSchedulerService:
             image_path = Path(bundle["image_path"])
 
             # 2. Publish to LinkedIn (Safe official REST API or fallback)
-            logger.info("Publishing in-depth article to LinkedIn (%d characters)...", len(post_text))
+            logger.info("Publishing in-depth article to LinkedIn (Total length: %d characters)...", len(post_text))
+            logger.info("Post commentary preview: %s", post_text[:250].replace('\n', ' '))
             try:
                 def _publish_lk():
                     return publish_article_to_linkedin_safe(post_text, image_path)

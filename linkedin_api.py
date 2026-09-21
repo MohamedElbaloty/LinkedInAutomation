@@ -247,7 +247,7 @@ class LinkedInAPIClient:
                 payload["content"] = {
                     "media": {
                         "id": image_urn,
-                        "title": "AI Technology Architecture & Engineering Analysis"
+                        "altText": "AI Technology Architecture & Engineering Analysis"
                     }
                 }
             except Exception as img_err:

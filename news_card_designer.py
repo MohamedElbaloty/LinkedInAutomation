@@ -175,7 +175,7 @@ def _render_layout_split_left(
     stat_x = 85
     stat_y = 135
     stat_w = 330
-    stat_h = 220
+    stat_h = 295
     draw.rounded_rectangle([stat_x, stat_y, stat_x + stat_w, stat_y + stat_h], radius=12, fill=(12, 18, 30), outline=primary, width=2)
     
     # Glowing Indicator inside stat box
@@ -186,16 +186,16 @@ def _render_layout_split_left(
     # Metric Number / Stat with Auto-Scaling
     display_metric = metric_value.strip() if metric_value else "LEADERSHIP"
     metric_font = _fit_metric_font(draw, display_metric, stat_w - 40, base_size=44)
-    draw.text((stat_x + 20, stat_y + 65), display_metric, font=metric_font, fill=(255, 255, 255))
+    draw.text((stat_x + 20, stat_y + 75), display_metric, font=metric_font, fill=(255, 255, 255))
     
     # Sub tag
     sub_tag = shape_arabic(metric_sub or "مؤشر السوق والنمو")
-    draw.text((stat_x + 20, stat_y + 150), sub_tag, font=fonts["metric_lbl"], fill=primary_light)
+    draw.text((stat_x + 20, stat_y + 165), sub_tag, font=fonts["metric_lbl"], fill=primary_light)
 
-    # Secondary Info Box below Stat Box
-    draw.rounded_rectangle([stat_x, stat_y + stat_h + 20, stat_x + stat_w, stat_y + stat_h + 65], radius=8, fill=(18, 28, 44), outline=(40, 60, 85), width=1)
-    lead_lbl = shape_arabic(f"المصدر: {source_name}" if source_name else "تحليل قطاعي تنفيذي")
-    draw.text((stat_x + 15, stat_y + stat_h + 30), lead_lbl, font=fonts["role"], fill=(203, 213, 225))
+    # Inner decorative divider & Executive badge
+    draw.line([(stat_x + 20, stat_y + 225), (stat_x + stat_w - 20, stat_y + 225)], fill=(30, 45, 65), width=1)
+    exec_lbl = shape_arabic("تحليل استراتيجي تنفيذي • MARKET INSIGHT")
+    draw.text((stat_x + 20, stat_y + 245), exec_lbl, font=fonts["role"], fill=(148, 163, 184))
 
     # Right Column: Headline & Editorial Bullet Points
     right_x = 450
@@ -246,7 +246,7 @@ def _render_layout_split_right(
 ):
     """Layout 2: RTL Natural Flow - Headline on the Left, Big Metric on the Right."""
     stat_w = 330
-    stat_h = 220
+    stat_h = 295
     stat_x = width - 85 - stat_w
     stat_y = 135
 
@@ -258,15 +258,15 @@ def _render_layout_split_right(
 
     display_metric = metric_value.strip() if metric_value else "LEADERSHIP"
     metric_font = _fit_metric_font(draw, display_metric, stat_w - 40, base_size=44)
-    draw.text((stat_x + 20, stat_y + 65), display_metric, font=metric_font, fill=(255, 255, 255))
+    draw.text((stat_x + 20, stat_y + 75), display_metric, font=metric_font, fill=(255, 255, 255))
     
     sub_tag = shape_arabic(metric_sub or "مؤشر السوق والنمو")
-    draw.text((stat_x + 20, stat_y + 150), sub_tag, font=fonts["metric_lbl"], fill=primary_light)
+    draw.text((stat_x + 20, stat_y + 165), sub_tag, font=fonts["metric_lbl"], fill=primary_light)
 
-    # Source Box below Stat
-    draw.rounded_rectangle([stat_x, stat_y + stat_h + 20, stat_x + stat_w, stat_y + stat_h + 65], radius=8, fill=(18, 28, 44), outline=(40, 60, 85), width=1)
-    lead_lbl = shape_arabic(f"المصدر: {source_name}" if source_name else "تحليل قطاعي تنفيذي")
-    draw.text((stat_x + 15, stat_y + stat_h + 30), lead_lbl, font=fonts["role"], fill=(203, 213, 225))
+    # Inner decorative divider & Executive badge
+    draw.line([(stat_x + 20, stat_y + 225), (stat_x + stat_w - 20, stat_y + 225)], fill=(30, 45, 65), width=1)
+    exec_lbl = shape_arabic("تحليل استراتيجي تنفيذي • MARKET INSIGHT")
+    draw.text((stat_x + 20, stat_y + 245), exec_lbl, font=fonts["role"], fill=(148, 163, 184))
 
     # Left Column: Headline & Bullet Points
     left_x = 85
@@ -344,8 +344,9 @@ def _render_layout_hero_top(
     sub_tag = shape_arabic(metric_sub or "مؤشر النمو والتوسع")
     draw.text((stat_x + 20, stat_y + 140), sub_tag, font=fonts["metric_lbl"], fill=primary_light)
 
-    src_label = shape_arabic(f"المصدر: {source_name}" if source_name else "تحليل تنفيذي")
-    draw.text((stat_x + 20, stat_y + 195), src_label, font=fonts["role"], fill=(148, 163, 184))
+    draw.line([(stat_x + 20, stat_y + 190), (stat_x + stat_w - 20, stat_y + 190)], fill=(30, 45, 65), width=1)
+    exec_lbl = shape_arabic("تحليل استراتيجي تنفيذي • INSIGHT")
+    draw.text((stat_x + 20, stat_y + 205), exec_lbl, font=fonts["role"], fill=(148, 163, 184))
 
     # Bottom Right: Bullet Points and Tags
     right_x = 460

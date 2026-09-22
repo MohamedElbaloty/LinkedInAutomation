@@ -301,3 +301,14 @@ async def api_toggle_commenting(data: CommentToggleRequest):
     settings["auto_comment_enabled"] = data.enabled
     save_comment_settings(settings)
     return {"success": True, "settings": settings}
+
+
+@app.get("/api/comment/latest-post")
+async def api_get_latest_post():
+    """Returns the most recent published post on LinkedIn for 1-click test commenting."""
+    from linkedin_api import get_recent_published_linkedin_posts
+    posts = get_recent_published_linkedin_posts(limit=1)
+    if posts:
+        return {"success": True, "post": posts[0]}
+    return {"success": False, "post": None}
+

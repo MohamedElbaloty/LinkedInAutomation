@@ -116,7 +116,44 @@ def extract_urn_from_linkedin_url(url_or_urn: str) -> str:
     if cleaned.startswith("urn:li:"):
         return cleaned.split("?")[0].rstrip("/")
 
-    return cleaned
+    return ""
+
+
+PUBLISHED_POSTS_FILE: Path = BASE_DIR / "published_linkedin_posts.json"
+
+
+def record_published_linkedin_post(urn: str, public_url: str, title: str = "") -> None:
+    """Records a successfully published LinkedIn post for tracking and 1-click test commenting."""
+    if not urn:
+        return
+    try:
+        posts = get_recent_published_linkedin_posts(limit=25)
+        posts = [p for p in posts if p.get("urn") != urn]
+        clean_url = public_url or (f"https://www.linkedin.com/feed/update/{urn}" if urn.startswith("urn:li:") else "https://www.linkedin.com/feed/")
+        new_entry = {
+            "urn": urn,
+            "url": clean_url,
+            "title": (title or "منشور تقني على LinkedIn").strip()[:120],
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        posts.insert(0, new_entry)
+        with open(PUBLISHED_POSTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(posts[:25], f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.warning("Failed to record published LinkedIn post: %s", e)
+
+
+def get_recent_published_linkedin_posts(limit: int = 5) -> List[Dict[str, str]]:
+    """Returns recently published LinkedIn posts."""
+    if not PUBLISHED_POSTS_FILE.exists():
+        return []
+    try:
+        with open(PUBLISHED_POSTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data[:limit] if isinstance(data, list) else []
+    except Exception as e:
+        logger.warning("Failed to load published LinkedIn posts: %s", e)
+        return []
 
 
 class LinkedInAPIClient:
@@ -426,6 +463,9 @@ class LinkedInAPIClient:
         post_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
         public_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else "https://www.linkedin.com/feed/"
         logger.info("Post published successfully on LinkedIn! URN: %s", post_urn)
+
+        if post_urn:
+            record_published_linkedin_post(urn=post_urn, public_url=public_url, title=post_text[:100])
 
         return {
             "success": True,

@@ -166,8 +166,8 @@ class CommentGenerator:
 
 def discover_trending_sector_post() -> Dict[str, any]:
     """
-    Finds a trending, highly relevant FinTech/PropTech/AI post or news item from the regional feeds.
-    Returns metadata including title, link, sector, and content snippet.
+    Finds a trending, highly relevant FinTech/PropTech/AI post or news item from regional feeds.
+    Returns metadata including clean title, news source link, direct LinkedIn search link, and content snippet.
     """
     unread = fetch_unread_articles()
     if unread:
@@ -176,10 +176,20 @@ def discover_trending_sector_post() -> Dict[str, any]:
         summary = (top_art.summary or top_art.title).replace("\n", " ").strip()
         if len(summary) > 280:
             summary = summary[:277] + "..."
+
+        # Extract focused search term for LinkedIn discussion search
+        clean_title = re.sub(r"[-|–—].*$", "", top_art.title).strip()
+        words = clean_title.split()
+        search_terms = " ".join(words[:6]) if len(words) > 6 else clean_title
+        encoded_query = urllib.parse.quote_plus(search_terms)
+        linkedin_search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_query}&sortBy=%22date_posted%22"
+
         return {
             "title": top_art.title,
+            "clean_title": clean_title,
             "source": top_art.source or "Saudi Tech Ecosystem",
-            "url": top_art.link,
+            "source_url": top_art.link,
+            "linkedin_search_url": linkedin_search_url,
             "summary": summary,
             "sector": "FinTech & PropTech Saudi/GCC",
             "post_text": f"{top_art.title}\n\n{summary}",
@@ -187,10 +197,14 @@ def discover_trending_sector_post() -> Dict[str, any]:
         }
 
     # Curated regional breaking discussions as rich fallback
+    default_title = "تسارع اعتماد Open Banking والمعالجة اللحظية للمدفوعات في السوق السعودي"
+    encoded_query = urllib.parse.quote_plus("Open Banking SAMA التقنية المالية السعودية")
     return {
-        "title": "تسارع اعتماد Open Banking والمعالجة اللحظية للمدفوعات في السوق السعودي",
+        "title": default_title,
+        "clean_title": default_title,
         "source": "Fintech Saudi / SAMA Updates",
-        "url": "https://www.linkedin.com/feed/",
+        "source_url": "https://fintechsaudi.com",
+        "linkedin_search_url": f"https://www.linkedin.com/search/results/content/?keywords={encoded_query}&sortBy=%22date_posted%22",
         "summary": "تحديثات موسعة من البنك المركزي السعودي SAMA لتمكين شركات الفنتك من الربط المباشر مع واجهات المصارف المفتوحة وتسريع معالجة الحوالات الفورية.",
         "sector": "FinTech & Open Banking",
         "post_text": "البنك المركزي السعودي يعلن توسيع نطاق تراخيص المصرفية المفتوحة وربط شركات التقنية المالية ببنية الدفع اللحظي عبر معايير ISO 20022 الموحدة.",
@@ -205,37 +219,63 @@ def draft_comment_for_target(
 ) -> Dict[str, any]:
     """
     High-level orchestrator that:
-    1. Resolves target post (either via user URL/text or auto-discovering sector trends).
+    1. Resolves target post:
+       - If user entered a real LinkedIn post URL -> extracts URN, points directly to that post.
+       - If auto-discovered news topic -> provides direct LinkedIn discussion search link + news source link.
     2. Drafts an anti-AI executive comment from Mohamed Elbaloty (CTO @ Sahalat).
     3. Normalizes target URN for LinkedIn API publishing.
     """
+    from linkedin_api import get_recent_published_linkedin_posts
+
     resolved_url = target_url_or_urn.strip()
     resolved_text = target_text.strip()
     resolved_title = target_title.strip()
     source_name = ""
+    source_url = None
+    linkedin_url = ""
+    is_linkedin_post = False
+    target_urn = ""
 
-    # If no URL or text provided, discover a trending sector topic
-    if not resolved_url and not resolved_text:
+    # Check if the provided URL is a real LinkedIn URL or URN
+    is_explicit_linkedin = (
+        "linkedin.com" in resolved_url
+        or resolved_url.startswith("urn:li:")
+        or (resolved_url.isdigit() and len(resolved_url) >= 15)
+    )
+
+    if is_explicit_linkedin:
+        is_linkedin_post = True
+        target_urn = extract_urn_from_linkedin_url(resolved_url)
+        linkedin_url = resolved_url if resolved_url.startswith("http") else (
+            f"https://www.linkedin.com/feed/update/{target_urn}" if target_urn else "https://www.linkedin.com/feed/"
+        )
+        if not resolved_text:
+            slug_match = re.search(r"linkedin\.com/posts/([^/?]+)", resolved_url)
+            if slug_match:
+                slug = slug_match.group(1).replace("-", " ")
+                resolved_title = f"منشور تقني: {slug[:60]}"
+                resolved_text = f"نقاش قطاعي حول: {slug}"
+            else:
+                resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
+                resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
+        source_name = "LinkedIn Post"
+    elif resolved_url and not is_explicit_linkedin:
+        # User entered an external URL (e.g. external news article)
+        is_linkedin_post = False
+        source_url = resolved_url
+        query_text = resolved_title or "FinTech PropTech Saudi Arabia"
+        encoded_query = urllib.parse.quote_plus(query_text)
+        linkedin_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_query}&sortBy=%22date_posted%22"
+        source_name = "External Tech News"
+    else:
+        # No URL provided: discover trending sector topic
         trending = discover_trending_sector_post()
         resolved_title = trending["title"]
-        resolved_url = trending["url"]
         resolved_text = trending["post_text"]
         source_name = trending["source"]
-    elif resolved_url and not resolved_text:
-        # User pasted a LinkedIn post URL: extract URN and guess title/slug
-        urn = extract_urn_from_linkedin_url(resolved_url)
-        slug_match = re.search(r"linkedin\.com/posts/([^/?]+)", resolved_url)
-        if slug_match:
-            slug = slug_match.group(1).replace("-", " ")
-            resolved_title = f"منشور تقني: {slug[:60]}"
-            resolved_text = f"نقاش قطاعي حول: {slug}"
-        else:
-            resolved_title = f"منشور على LinkedIn ({urn or 'تفاعل مجتمعي'})"
-            resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
-        source_name = "LinkedIn Post"
-
-    # Extract clean target URN if this is a LinkedIn post
-    target_urn = extract_urn_from_linkedin_url(resolved_url)
+        source_url = trending.get("source_url")
+        linkedin_url = trending.get("linkedin_search_url", "https://www.linkedin.com/search/results/content/")
+        is_linkedin_post = False
 
     generator = CommentGenerator()
     comment = generator.generate_comment(
@@ -244,14 +284,21 @@ def draft_comment_for_target(
         post_author=source_name,
     )
 
+    recent_user_posts = get_recent_published_linkedin_posts(limit=3)
+
     return {
         "success": True,
+        "is_linkedin_post": is_linkedin_post,
+        "can_publish": is_linkedin_post and bool(target_urn),
         "post_title": resolved_title,
-        "post_url": resolved_url,
-        "post_urn": target_urn,
+        "post_urn": target_urn if is_linkedin_post else None,
+        "post_url": linkedin_url,
+        "linkedin_url": linkedin_url,
+        "source_url": source_url,
         "post_content_snippet": resolved_text[:240] + ("..." if len(resolved_text) > 240 else ""),
         "comment_text": comment,
         "author_persona": "Mohamed Elbaloty, CTO @ Sahalat",
+        "recent_user_posts": recent_user_posts,
     }
 
 
@@ -268,8 +315,9 @@ def execute_linkedin_comment(
         return {
             "success": False,
             "error": (
-                f"رابط المنشور غير صالح أو لا يحتوي على معرف URN رسمي للينكد إن: '{target_urn_or_url}'. "
-                "يرجى التأكد من وضع رابط منشور كامل مثل: https://www.linkedin.com/posts/..."
+                "تعذر تحديد معرف المنشور على LinkedIn (URN). "
+                "للنشر الفعلي على LinkedIn، يجب استخدام رابط منشور كامل يبدأ بـ https://www.linkedin.com/posts/... "
+                "أو تجربة التعليق على آخر منشور منشور في حسابك بنقرة واحدة."
             ),
         }
 

@@ -321,6 +321,13 @@ class GrowthSchedulerService:
                 linkedin_res = await loop.run_in_executor(None, _publish_lk)
                 result["linkedin"] = linkedin_res
                 logger.info("LinkedIn publishing result: %s", linkedin_res)
+                if linkedin_res.get("success") and linkedin_res.get("post_urn"):
+                    from linkedin_api import record_published_linkedin_post
+                    record_published_linkedin_post(
+                        urn=linkedin_res.get("post_urn", ""),
+                        public_url=linkedin_res.get("public_url", ""),
+                        title=article.title
+                    )
             except Exception as lk_exc:
                 logger.error("LinkedIn publish step failed: %s", lk_exc)
                 result["linkedin"] = {"success": False, "error": str(lk_exc)}

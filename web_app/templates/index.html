@@ -136,6 +136,17 @@
                 </div>
             </div>
 
+            <!-- Quick Action Helpers -->
+            <div class="comment-quick-actions" id="comment-quick-actions">
+                <span class="quick-actions-label">⚡ تجربة سريعة:</span>
+                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch()">
+                    🔍 استعراض منشورات FinTech & PropTech على LinkedIn ↗️
+                </button>
+                <button type="button" class="btn-chip" id="btn-chip-my-post" onclick="quickFillMyLatestPost()" style="display: none;">
+                    📌 تجربة التعليق على آخر منشور في حسابك
+                </button>
+            </div>
+
             <!-- Comment Progress / Loading Spinner -->
             <div class="comment-loading-box" id="comment-loading-box" style="display: none;">
                 <div class="spinner"></div>
@@ -146,13 +157,30 @@
             <div class="comment-review-box" id="comment-review-box" style="display: none;">
                 <div class="review-header">
                     <div class="post-preview-info">
-                        <span class="target-tag">📌 المنشور المستهدف:</span>
-                        <h4 class="target-title" id="review-target-title">عنوان المنشور</h4>
-                        <div class="target-meta">
+                        <div class="target-meta-top">
+                            <span class="target-tag" id="review-target-type-tag">📌 المنشور المستهدف:</span>
                             <span class="target-urn-badge" id="review-target-urn">urn:li:activity:...</span>
-                            <a href="#" target="_blank" class="link-external" id="review-target-url-link">
-                                🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️
+                        </div>
+                        <h4 class="target-title" id="review-target-title">عنوان المنشور</h4>
+                        
+                        <div class="target-links-row" id="review-target-links">
+                            <!-- Direct LinkedIn Link (Always points to LinkedIn) -->
+                            <a href="#" target="_blank" class="link-external link-linkedin" id="review-linkedin-link">
+                                <span id="review-linkedin-link-text">🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️</span>
                             </a>
+                            <!-- External News Source Link (Displayed if derived from news feed) -->
+                            <a href="#" target="_blank" class="link-external link-source" id="review-source-link" style="display: none;">
+                                <span>📰 مصدر الخبر الأصلي (الموقع الإخباري) ↗️</span>
+                            </a>
+                        </div>
+
+                        <!-- Guidance Notice when target is a news topic -->
+                        <div class="comment-guidance-box" id="review-comment-guidance" style="display: none;">
+                            <span class="guidance-icon">💡</span>
+                            <div class="guidance-content">
+                                <strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث الأخبار وتوليد تعليق CTO احترافي عليه.
+                                للتعليق الفعلي على لينكد إن، افتح رابط مناقشات الخبر على LinkedIn أعلاه، وانسخ رابط أي منشور من لينكد إن ثم الصقه في المربع واضغط "علق الآن"، أو جرب التعليق على آخر منشور في حسابك.
+                            </div>
                         </div>
                     </div>
                 </div>

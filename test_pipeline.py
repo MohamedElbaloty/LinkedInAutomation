@@ -37,7 +37,7 @@ class TestAINewsAgent(unittest.TestCase):
         self.assertIsInstance(config.AI_RSS_FEEDS, list)
         self.assertGreater(len(config.AI_RSS_FEEDS), 0)
         self.assertIn("gemini", config.TEXT_MODEL.lower())
-        self.assertIn("imagen", config.IMAGE_MODEL.lower())
+        self.assertTrue(any(k in config.IMAGE_MODEL.lower() for k in ["gemini", "imagen", "banana"]))
         self.assertEqual(config.SCHEDULE_HOURS, [9, 18])
 
     def test_html_sanitization(self):
@@ -92,12 +92,22 @@ class TestAINewsAgent(unittest.TestCase):
         """Test Pydantic schema validation for Gemini responses."""
         sample_data = {
             "short_hook": "اختراق تقني جديد في معالجة النماذج اللغوية!",
-            "post_text": "🚀 تفاصيل معمارية الذكاء الاصطناعي الجديدة...\n#AI #SoftwareEngineering #AgenticAI",
-            "image_prompt": "Editorial 3D visualization of neural pathways connecting microchips in minimalist dark aesthetic.",
+            "linkedin_post": "🚀 تفاصيل معمارية الذكاء الاصطناعي الجديدة...\n#AI #SoftwareEngineering #AgenticAI",
+            "telegram_caption": "ملخص تقني سريع لقناة تليجرام",
+            "card_headline": "قفزة تقنية في معالجة النماذج",
+            "card_sub_headline": "بنية معمارية جديدة لنماذج الاستدلال",
+            "category_badge": "ذكاء اصطناعي | AI",
+            "event_badge": "قفزة هندسية",
+            "metric_value": "99.4%",
+            "metric_label": "دقة الاستدلال",
+            "metric_sub": "Benchmark",
+            "bullet_points": ["معمارية متطورة", "كفاءة حسابية"],
+            "sector_tags": ["#AI", "#Tech"],
+            "image_prompt": "Editorial 3D visualization of neural pathways in dark aesthetic.",
         }
         result = GenerationResult(**sample_data)
         self.assertEqual(result.short_hook, sample_data["short_hook"])
-        self.assertIn("#AI", result.post_text)
+        self.assertIn("#AI", result.linkedin_post)
 
     def test_rss_fetching_live(self):
         """Test fetching live articles from configured RSS feeds."""

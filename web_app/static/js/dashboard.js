@@ -9,6 +9,7 @@ let isPublishing = false;
 document.addEventListener('DOMContentLoaded', () => {
     initScheduleChips();
     pollSystemStatus();
+    checkLatestPublishedUserPost();
     // Poll status every 12 seconds
     setInterval(pollSystemStatus, 12000);
 });
@@ -455,12 +456,45 @@ async function triggerDraftComment() {
             currentDraftPost = data;
 
             document.getElementById('review-target-title').textContent = data.post_title || 'منشور قطاعي متخصص';
-            document.getElementById('review-target-urn').textContent = data.post_urn || 'LinkedIn Feed Post';
             
-            const linkElem = document.getElementById('review-target-url-link');
-            if (linkElem) {
-                linkElem.href = data.post_url || '#';
-                linkElem.style.display = data.post_url ? 'inline-flex' : 'none';
+            const urnElem = document.getElementById('review-target-urn');
+            const typeTag = document.getElementById('review-target-type-tag');
+            const linkedinLink = document.getElementById('review-linkedin-link');
+            const linkedinLinkText = document.getElementById('review-linkedin-link-text');
+            const sourceLink = document.getElementById('review-source-link');
+            const guidanceBox = document.getElementById('review-comment-guidance');
+
+            if (data.is_linkedin_post) {
+                if (typeTag) typeTag.textContent = '📌 منشور LinkedIn مستهدف:';
+                if (urnElem) urnElem.textContent = data.post_urn || 'منشور رسمي على LinkedIn';
+                if (linkedinLink) {
+                    linkedinLink.href = data.linkedin_url || data.post_url || '#';
+                    linkedinLink.style.display = 'inline-flex';
+                }
+                if (linkedinLinkText) {
+                    linkedinLinkText.textContent = '🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️';
+                }
+                if (sourceLink) sourceLink.style.display = 'none';
+                if (guidanceBox) guidanceBox.style.display = 'none';
+            } else {
+                if (typeTag) typeTag.textContent = '📰 موضوع قطاعي مقترح للنقاش:';
+                if (urnElem) urnElem.textContent = 'استكشاف قطاعي ذكي';
+                if (linkedinLink) {
+                    linkedinLink.href = data.linkedin_url || 'https://www.linkedin.com/search/results/content/';
+                    linkedinLink.style.display = 'inline-flex';
+                }
+                if (linkedinLinkText) {
+                    linkedinLinkText.textContent = '🔍 استعراض منشورات النقاش حول هذا الموضوع على LinkedIn ↗️';
+                }
+                if (sourceLink) {
+                    if (data.source_url) {
+                        sourceLink.href = data.source_url;
+                        sourceLink.style.display = 'inline-flex';
+                    } else {
+                        sourceLink.style.display = 'none';
+                    }
+                }
+                if (guidanceBox) guidanceBox.style.display = 'flex';
             }
 
             const textarea = document.getElementById('review-comment-textarea');
@@ -500,6 +534,22 @@ async function triggerPublishComment() {
         return;
     }
 
+    // If user clicked publish on an auto-discovered news article that doesn't have a LinkedIn URN
+    if (!currentDraftPost.is_linkedin_post && !currentDraftPost.post_urn) {
+        alertBox.className = 'comment-alert-box error';
+        alertBox.innerHTML = `
+            <div style="font-weight: 700; margin-bottom: 6px;">⚠️ تنبيه قبل النشر:</div>
+            <div style="font-size: 13px; line-height: 1.6;">
+                هذا الموضوع تم استكشافه من الأخبار لتوليد صياغة التعليق ورؤية الـ CTO.<br>
+                لنشر التعليق الفعلي على لينكد إن، اضغط على زر <strong>"🔍 استعراض منشورات النقاش حول هذا الموضوع على LinkedIn"</strong> بالأعلى، وانسخ رابط أي منشور من لينكد إن والصقه في المربع واضغط "علق الآن"، أو جرب التعليق على آخر منشور في حسابك بنقرة واحدة!
+            </div>
+        `;
+        alertBox.style.display = 'block';
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        isPublishingComment = false;
+        return;
+    }
+
     publishBtn.disabled = true;
     publishBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> جاري النشر على LinkedIn...';
     alertBox.style.display = 'none';
@@ -521,7 +571,7 @@ async function triggerPublishComment() {
         isPublishingComment = false;
 
         if (result.success) {
-            const viewUrl = result.public_url || (currentDraftPost.post_url ? currentDraftPost.post_url : 'https://www.linkedin.com/feed/');
+            const viewUrl = result.public_url || (currentDraftPost.post_urn ? `https://www.linkedin.com/feed/update/${currentDraftPost.post_urn}` : 'https://www.linkedin.com/feed/');
             alertBox.className = 'comment-alert-box success';
             alertBox.innerHTML = `
                 <div style="font-weight: 700; margin-bottom: 6px;">🎉 تم نشر تعليقك بنجاح وبشكل فوري على LinkedIn!</div>
@@ -547,6 +597,40 @@ async function triggerPublishComment() {
         alertBox.className = 'comment-alert-box error';
         alertBox.innerHTML = `<strong>❌ خطأ غير متوقع:</strong> ${err.message}`;
         alertBox.style.display = 'block';
+    }
+}
+
+// Quick Actions
+function openTrendingLinkedInSearch() {
+    const url = 'https://www.linkedin.com/search/results/content/?keywords=%D8%AA%D9%82%D9%86%D9%8A%D8%A9%20%D9%85%D8%A7%D9%84%D9%8A%D8%A9%20%D8%A7%D9%84%D8%B3%D8%B9%D9%88%D8%AF%D9%8A%D8%A9%20OR%20PropTech%20Saudi&sortBy=%22date_posted%22';
+    window.open(url, '_blank');
+}
+
+let latestPublishedUserPost = null;
+
+async function checkLatestPublishedUserPost() {
+    try {
+        const res = await fetch('/api/comment/latest-post');
+        const data = await res.json();
+        if (data.success && data.post) {
+            latestPublishedUserPost = data.post;
+            const btn = document.getElementById('btn-chip-my-post');
+            if (btn) {
+                btn.style.display = 'inline-flex';
+                btn.title = data.post.title || 'آخر منشور تم نشره من حسابك';
+            }
+        }
+    } catch (e) {
+        // silent
+    }
+}
+
+function quickFillMyLatestPost() {
+    if (!latestPublishedUserPost) return;
+    const input = document.getElementById('target-post-url-input');
+    if (input) {
+        input.value = latestPublishedUserPost.url || (latestPublishedUserPost.urn ? `https://www.linkedin.com/feed/update/${latestPublishedUserPost.urn}` : '');
+        triggerDraftComment();
     }
 }
 

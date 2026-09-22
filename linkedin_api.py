@@ -237,9 +237,95 @@ class LinkedInAPIClient:
         logger.info("Successfully uploaded image to LinkedIn with URN: %s", image_urn)
         return image_urn
 
-    def create_post(self, post_text: str, image_path: Optional[Path] = None) -> Dict[str, any]:
+    def upload_video(self, video_path: Path) -> str:
         """
-        Creates a public post on LinkedIn with optional media attachment.
+        Uploads a native video to LinkedIn using the official 3-step REST Videos API.
+        1. Initialize Upload (action=initializeUpload)
+        2. Upload binary bytes with ETags
+        3. Finalize Upload (action=finalizeUpload)
+        Returns the registered video URN (e.g. 'urn:li:video:...').
+        """
+        video_path = Path(video_path)
+        if not video_path.exists():
+            raise FileNotFoundError(f"Video not found at {video_path}")
+
+        if not self.person_urn:
+            self.fetch_my_profile_urn()
+
+        file_size = video_path.stat().st_size
+        logger.info("Initializing LinkedIn video upload for %s (size: %d bytes)...", video_path.name, file_size)
+
+        # Step 1: Initialize Upload
+        init_url = f"{LINKEDIN_API_BASE}/rest/videos?action=initializeUpload"
+        init_payload = {
+            "initializeUploadRequest": {
+                "owner": self.person_urn,
+                "fileSizeBytes": file_size,
+                "uploadCaptions": False,
+                "uploadThumbnail": False
+            }
+        }
+        resp = self._request_with_version_retry("POST", init_url, json=init_payload, timeout=25)
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(f"Failed to initialize video upload: {resp.status_code} - {resp.text}")
+
+        init_data = resp.json().get("value", {})
+        video_urn = init_data.get("video")
+        upload_token = init_data.get("uploadToken")
+        upload_instructions = init_data.get("uploadInstructions", [])
+
+        if not video_urn or not upload_instructions:
+            raise RuntimeError(f"Invalid video upload initialization response: {init_data}")
+
+        # Step 2: Upload Video Parts with ETags
+        uploaded_part_ids = []
+        with open(video_path, "rb") as vf:
+            for instruction in upload_instructions:
+                upload_url = instruction.get("uploadUrl")
+                first_byte = instruction.get("firstByte", 0)
+                last_byte = instruction.get("lastByte", file_size - 1)
+                chunk_len = last_byte - first_byte + 1
+
+                vf.seek(first_byte)
+                chunk_data = vf.read(chunk_len)
+
+                upload_headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Content-Type": "application/octet-stream",
+                }
+                put_resp = requests.put(upload_url, data=chunk_data, headers=upload_headers, timeout=120)
+                if put_resp.status_code not in (200, 201, 204):
+                    raise RuntimeError(f"Failed to upload video chunk ({first_byte}-{last_byte}): {put_resp.status_code}")
+
+                etag = put_resp.headers.get("etag") or put_resp.headers.get("ETag") or ""
+                if etag:
+                    uploaded_part_ids.append(etag.strip('"'))
+
+        # Step 3: Finalize Upload
+        fin_url = f"{LINKEDIN_API_BASE}/rest/videos?action=finalizeUpload"
+        fin_payload = {
+            "finalizeUploadRequest": {
+                "video": video_urn,
+                "uploadToken": upload_token or "",
+                "uploadedPartIds": uploaded_part_ids
+            }
+        }
+        fin_resp = self._request_with_version_retry("POST", fin_url, json=fin_payload, timeout=25)
+        if fin_resp.status_code not in (200, 201, 204):
+            logger.warning("Video finalize response status: %s (continuing)", fin_resp.status_code)
+
+        logger.info("Successfully uploaded video to LinkedIn with URN: %s", video_urn)
+        return video_urn
+
+    def create_post(
+        self,
+        post_text: str,
+        media_path: Optional[Path] = None,
+        image_path: Optional[Path] = None,
+        video_path: Optional[Path] = None,
+    ) -> Dict[str, any]:
+        """
+        Creates a public post on LinkedIn with optional media attachment (Native Video or Image).
         Returns dictionary containing post_urn and public_url.
         """
         if not self.person_urn:
@@ -266,18 +352,37 @@ class LinkedInAPIClient:
             "isReshareDisabledByAuthor": False
         }
 
-        # Attach image if provided
-        if image_path and Path(image_path).exists():
-            try:
-                image_urn = self.upload_image(Path(image_path))
-                payload["content"] = {
-                    "media": {
-                        "id": image_urn,
-                        "altText": "AI Technology Architecture & Engineering Analysis"
+        # Resolve media path
+        resolved_media = media_path or video_path or image_path
+        if resolved_media:
+            resolved_media = Path(resolved_media)
+
+        if resolved_media and resolved_media.exists():
+            is_video = resolved_media.suffix.lower() in [".mp4", ".mov", ".webm", ".mkv"]
+            if is_video:
+                try:
+                    logger.info("Attaching native video to LinkedIn post: %s", resolved_media.name)
+                    video_urn = self.upload_video(resolved_media)
+                    payload["content"] = {
+                        "media": {
+                            "id": video_urn,
+                            "title": "FinTech / PropTech / AI Innovation"
+                        }
                     }
-                }
-            except Exception as img_err:
-                logger.warning("Image attachment could not be uploaded (%s). Publishing high-impact text post.", img_err)
+                except Exception as vid_err:
+                    logger.warning("Video attachment upload failed (%s). Falling back to text post.", vid_err)
+            else:
+                try:
+                    logger.info("Attaching image to LinkedIn post: %s", resolved_media.name)
+                    image_urn = self.upload_image(resolved_media)
+                    payload["content"] = {
+                        "media": {
+                            "id": image_urn,
+                            "altText": "AI, FinTech & PropTech Technology Architecture"
+                        }
+                    }
+                except Exception as img_err:
+                    logger.warning("Image attachment upload failed (%s). Falling back to text post.", img_err)
 
         resp = self._request_with_version_retry("POST", url, json=payload, timeout=25)
         if resp.status_code not in (200, 201):
@@ -295,9 +400,14 @@ class LinkedInAPIClient:
         }
 
 
-def publish_article_to_linkedin_safe(post_text: str, image_path: Optional[Path] = None) -> Dict[str, any]:
+def publish_article_to_linkedin_safe(
+    post_text: str,
+    media_path: Optional[Path] = None,
+    image_path: Optional[Path] = None,
+    video_path: Optional[Path] = None,
+) -> Dict[str, any]:
     """
-    Unified entry point for publishing to LinkedIn.
+    Unified entry point for publishing to LinkedIn. Supports both native video and image attachments.
     1. If official API token is configured -> Uses official 100% safe REST API.
     2. If local browser profile exists -> Falls back to local Playwright session (Local ONLY).
     3. Returns dict with status, method, and URL.
@@ -310,12 +420,14 @@ def publish_article_to_linkedin_safe(post_text: str, image_path: Optional[Path] 
         or os.getenv("KUBERNETES_SERVICE_HOST")
     )
 
+    resolved_media = media_path or video_path or image_path
+
     # 1. First priority: Official REST API (Safe for Cloud & Railway)
     if token:
         try:
             logger.info("Using Official LinkedIn REST API for publishing...")
             client = LinkedInAPIClient(access_token=token)
-            return client.create_post(post_text, image_path)
+            return client.create_post(post_text, media_path=resolved_media)
         except Exception as api_err:
             logger.error("Official LinkedIn API publish failed: %s", api_err)
             if is_cloud:

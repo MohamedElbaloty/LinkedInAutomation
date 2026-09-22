@@ -44,6 +44,8 @@ SCHEDULE_TIMES: List[str] = [t.strip() for t in _times_raw.split(",") if ":" in 
 DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "news_history.db").strip()
 IMAGES_DIR: Path = BASE_DIR / os.getenv("IMAGES_DIR", "output_images").strip()
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+VIDEOS_DIR: Path = BASE_DIR / os.getenv("VIDEOS_DIR", "output_videos").strip()
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Curated High-Quality Saudi, GCC & Global Tech Feeds (FinTech, PropTech, AI)
 AI_RSS_FEEDS: List[dict] = [

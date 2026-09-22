@@ -303,14 +303,16 @@ class AIGenerator:
             return stamp_author_branding(raw_path)
 
 
-def create_ai_bundle(article: Article) -> Dict[str, any]:
+def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, any]:
     """
-    Convenience orchestrator for generating post copy, image prompt, and generating the image file.
-    Returns a dictionary containing the post text, hook, image prompt, and image file path.
+    Convenience orchestrator for generating post copy, image prompt, and optionally generating the image file.
+    Returns a dictionary containing the post text, hook, image prompt, and image file path (or None if skip_image=True).
     """
     generator = AIGenerator()
     content_result = generator.generate_post_and_prompt(article)
-    image_path = generator.generate_image(content_result.image_prompt, article.id)
+    image_path = None
+    if not skip_image:
+        image_path = generator.generate_image(content_result.image_prompt, article.id)
 
     return {
         "article": article,
@@ -321,3 +323,4 @@ def create_ai_bundle(article: Article) -> Dict[str, any]:
         "image_prompt": content_result.image_prompt,
         "image_path": image_path,
     }
+

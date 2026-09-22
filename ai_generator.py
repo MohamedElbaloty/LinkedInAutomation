@@ -70,7 +70,12 @@ class GenerationResult(BaseModel):
         description="3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce']."
     )
     theme_name: str = Field(
-        description="Color theme matching the sector: 'fintech_emerald', 'ai_cyan', 'proptech_amber', 'saudi_gold', or 'deeptech_purple'."
+        default="auto",
+        description="Color theme matching the sector and mood: 'fintech_emerald', 'saudi_gold', 'ai_cyan', 'proptech_amber', 'deeptech_purple', 'bloomberg_orange', 'crimson_pulse', or 'midnight_sapphire'."
+    )
+    layout_archetype: Optional[str] = Field(
+        default="auto",
+        description="Visual layout structure: 'split_left' (metric left), 'split_right' (metric right), or 'hero_top' (full-width banner)."
     )
     image_prompt: Optional[str] = Field(
         default="",
@@ -121,7 +126,8 @@ class AIGenerator:
             "9. 'metric_sub': Sub-label under metric (e.g. 'Pre-Series C • مبادلة + EBRD' or 'السوق السعودي').\n"
             "10. 'bullet_points': 2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card.\n"
             "11. 'sector_tags': 3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce'].\n"
-            "12. 'theme_name': Choose from ['fintech_emerald', 'ai_cyan', 'proptech_amber', 'saudi_gold', 'deeptech_purple'].\n\n"
+            "12. 'theme_name': Choose dynamically from ['fintech_emerald', 'saudi_gold', 'ai_cyan', 'proptech_amber', 'deeptech_purple', 'bloomberg_orange', 'crimson_pulse', 'midnight_sapphire']. Select the most appropriate color theme for the sector.\n"
+            "13. 'layout_archetype': Choose dynamically from ['split_left', 'split_right', 'hero_top'] to give each news card a unique layout.\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
             "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
             "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"
@@ -358,7 +364,8 @@ class AIGenerator:
                 bullet_points=getattr(content_result, "bullet_points", None) or [article.title],
                 sector_tags=getattr(content_result, "sector_tags", None) or ["السوق السعودي", "الابتكار الرقمي", "رؤية 2030"],
                 source_name=article.source,
-                theme_name=getattr(content_result, "theme_name", "fintech_emerald") or "fintech_emerald",
+                theme_name=getattr(content_result, "theme_name", "auto") or "auto",
+                layout_archetype=getattr(content_result, "layout_archetype", "auto") or "auto",
                 target_path=target_path,
             )
         except Exception as e:
@@ -391,7 +398,8 @@ def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, an
             "sub_headline": getattr(content_result, "card_sub_headline", ""),
             "metric_value": getattr(content_result, "metric_value", ""),
             "metric_label": getattr(content_result, "metric_label", ""),
-            "theme": getattr(content_result, "theme_name", "fintech_emerald"),
+            "theme": getattr(content_result, "theme_name", "auto"),
+            "layout": getattr(content_result, "layout_archetype", "auto"),
         },
     }
 

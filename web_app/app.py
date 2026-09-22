@@ -86,7 +86,7 @@ class CommentDraftRequest(BaseModel):
 
 
 class CommentPublishRequest(BaseModel):
-    target_urn: str
+    target_urn: Optional[str] = ""
     comment_text: str
     post_title: Optional[str] = None
 

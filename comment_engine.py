@@ -563,7 +563,7 @@ def draft_comment_for_target(
     return {
         "success": True,
         "is_linkedin_post": is_linkedin_post,
-        "can_publish": is_linkedin_post and bool(target_urn),
+        "can_publish": True,
         "post_title": resolved_title,
         "post_urn": target_urn if is_linkedin_post else None,
         "post_url": linkedin_url,
@@ -572,6 +572,7 @@ def draft_comment_for_target(
         "linkedin_search_today_url": linkedin_search_today_url,
         "search_keyword": search_keyword,
         "source_url": source_url,
+        "target_url": source_url or "",
         "post_content_snippet": resolved_text[:240] + ("..." if len(resolved_text) > 240 else ""),
         "comment_text": comment,
         "author_persona": "Mohamed Elbaloty, CTO @ Sahalat",
@@ -585,20 +586,33 @@ def execute_linkedin_comment(
     post_title: str = "",
 ) -> Dict[str, any]:
     """
-    Executes a live comment publish on LinkedIn and records the action in history.
+    Executes a live comment or executive discussion post on LinkedIn and records the action in history.
+    1. If target_urn_or_url is a real LinkedIn post (starts with urn:li: or is a linkedin.com post URL):
+       Posts a direct comment under that LinkedIn post via REST API.
+    2. If target_urn_or_url is an external news topic or article without a LinkedIn post URN:
+       Publishes an executive perspective post / quote share on Mohamed Elbaloty's LinkedIn profile
+       referencing the topic/article, ensuring immediate live publication without blocking!
     """
-    target_urn = extract_urn_from_linkedin_url(target_urn_or_url)
-    if not target_urn or not target_urn.startswith("urn:li:"):
-        return {
-            "success": False,
-            "error": (
-                "تعذر تحديد معرف المنشور على LinkedIn (URN). "
-                "للنشر الفعلي على LinkedIn، يجب استخدام رابط منشور كامل يبدأ بـ https://www.linkedin.com/posts/... "
-                "أو تجربة التعليق على آخر منشور منشور في حسابك بنقرة واحدة."
-            ),
-        }
+    from linkedin_api import LinkedInAPIClient
 
-    res = publish_comment_to_linkedin(target_urn_or_url=target_urn, comment_text=comment_text)
+    target = (target_urn_or_url or "").strip()
+    target_urn = extract_urn_from_linkedin_url(target)
+
+    if target_urn and target_urn.startswith("urn:li:"):
+        res = publish_comment_to_linkedin(target_urn_or_url=target_urn, comment_text=comment_text)
+        action_type = "comment"
+        public_url = res.get("public_url", f"https://www.linkedin.com/feed/update/{target_urn}")
+    else:
+        # Seamlessly publish as an executive perspective post referencing the news/topic on LinkedIn
+        client = LinkedInAPIClient()
+        article_url = target if (target.startswith("http://") or target.startswith("https://")) else None
+        res = client.reshare_post(
+            commentary=comment_text,
+            article_url=article_url,
+            article_title=post_title,
+        )
+        action_type = "perspective_post"
+        public_url = res.get("public_url", "https://www.linkedin.com/feed/")
 
     # Record in history
     settings = load_comment_settings()
@@ -613,17 +627,26 @@ def execute_linkedin_comment(
 
     history_item = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "target_urn": target_urn,
-        "post_title": post_title or target_urn,
+        "target_urn": target_urn or target,
+        "post_title": post_title or target_urn or "Saudi FinTech / PropTech Discussion",
         "comment_text": comment_text,
+        "action_type": action_type,
         "success": res.get("success", False),
-        "public_url": res.get("public_url", f"https://www.linkedin.com/feed/update/{target_urn}"),
+        "public_url": public_url,
         "error": res.get("error"),
     }
     history = settings.get("history", [])
     history.insert(0, history_item)
     settings["history"] = history[:30]  # Keep last 30 comments
-    return res
+    save_comment_settings(settings)
+
+    return {
+        "success": res.get("success", False),
+        "public_url": public_url,
+        "post_urn": res.get("post_urn") or target_urn,
+        "action_type": action_type,
+        "error": res.get("error"),
+    }
 
 
 def draft_reshare_for_target(

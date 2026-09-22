@@ -631,32 +631,17 @@ async function triggerPublishComment() {
         return;
     }
 
-    // If user clicked publish on an auto-discovered news article that doesn't have a LinkedIn URN
-    if (!currentDraftPost.is_linkedin_post && !currentDraftPost.post_urn) {
-        alertBox.className = 'comment-alert-box error';
-        alertBox.innerHTML = `
-            <div style="font-weight: 700; margin-bottom: 6px;">⚠️ تنبيه قبل النشر:</div>
-            <div style="font-size: 13px; line-height: 1.6;">
-                هذا الموضوع تم استكشافه من الأخبار لتوليد صياغة التعليق ورؤية الـ CTO.<br>
-                لنشر التعليق الفعلي على لينكد إن، اضغط على زر <strong>"🔍 استعراض منشورات النقاش حول هذا الموضوع على LinkedIn"</strong> بالأعلى، وانسخ رابط أي منشور من لينكد إن والصقه في المربع واضغط "علق الآن"، أو جرب التعليق على آخر منشور في حسابك بنقرة واحدة!
-            </div>
-        `;
-        alertBox.style.display = 'block';
-        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        isPublishingComment = false;
-        return;
-    }
-
     publishBtn.disabled = true;
     publishBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> جاري النشر على LinkedIn...';
     alertBox.style.display = 'none';
 
     try {
+        const targetUrnOrUrl = currentDraftPost.post_urn || currentDraftPost.target_url || currentDraftPost.source_url || currentDraftPost.post_url || '';
         const response = await fetch('/api/comment/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                target_urn: currentDraftPost.post_urn || currentDraftPost.post_url,
+                target_urn: targetUrnOrUrl,
                 comment_text: commentText,
                 post_title: currentDraftPost.post_title
             })
@@ -953,10 +938,10 @@ async function loadTrendingTodayTopics() {
                     </div>
                     <div class="today-topic-title" title="${escapeHtml(topic.title)}">${escapeHtml(topic.clean_title || topic.title)}</div>
                     <div class="today-topic-actions">
-                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, 'comment')" title="توليد تعليق CTO مباشر">
+                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, ${JSON.stringify(topic.source_url || '').replace(/"/g, '&quot;')}, 'comment')" title="توليد تعليق CTO مباشر">
                             💬 تعليق CTO
                         </button>
-                        <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
+                        <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, ${JSON.stringify(topic.source_url || '').replace(/"/g, '&quot;')}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
                             🚀 مشاركة وتحليل
                         </button>
                         <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض النقاشات على LinkedIn">
@@ -973,11 +958,11 @@ async function loadTrendingTodayTopics() {
     }
 }
 
-function selectTodayTopic(title, mode = 'comment') {
+function selectTodayTopic(title, sourceUrl = '', mode = 'comment') {
     switchEngagementMode(mode);
     const input = document.getElementById('target-post-url-input');
     if (input) {
-        input.value = title;
+        input.value = sourceUrl || title;
         triggerEngagementAction();
     }
 }

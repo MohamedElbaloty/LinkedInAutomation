@@ -47,6 +47,9 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 VIDEOS_DIR: Path = BASE_DIR / os.getenv("VIDEOS_DIR", "output_videos").strip()
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
+# Recency Threshold (Strict: Only news from the last 48 hours is accepted)
+MAX_ARTICLE_AGE_HOURS: int = int(os.getenv("MAX_ARTICLE_AGE_HOURS", "48"))
+
 # Curated High-Quality Saudi, GCC & Global Tech Feeds (FinTech, PropTech, AI)
 AI_RSS_FEEDS: List[dict] = [
     {
@@ -61,17 +64,17 @@ AI_RSS_FEEDS: List[dict] = [
     },
     {
         "name": "Saudi & GCC FinTech Pulse",
-        "url": "https://news.google.com/rss/search?q=(Saudi+OR+GCC+OR+UAE)+(Fintech+OR+Proptech)&hl=en-US&gl=US&ceid=US:en",
+        "url": "https://news.google.com/rss/search?q=(Saudi+OR+GCC+OR+UAE)+(Fintech+OR+Proptech)+when:48h&hl=en-US&gl=US&ceid=US:en",
         "category": "Fintech & Proptech",
     },
     {
         "name": "Saudi PropTech & Real Estate Tech",
-        "url": "https://news.google.com/rss/search?q=(Saudi+Arabia+Proptech)+OR+(Saudi+Real+Estate+tech)+OR+(ROSHN+technology)&hl=en-US&gl=US&ceid=US:en",
+        "url": "https://news.google.com/rss/search?q=(Saudi+Arabia+Proptech)+OR+(Saudi+Real+Estate+technology)+OR+(ROSHN)+when:48h&hl=en-US&gl=US&ceid=US:en",
         "category": "Proptech",
     },
     {
         "name": "SAMA & Saudi Banking Innovations",
-        "url": "https://news.google.com/rss/search?q=(Saudi+Fintech)+OR+(SAMA+Open+Banking)+OR+(Saudi+payments)&hl=en-US&gl=US&ceid=US:en",
+        "url": "https://news.google.com/rss/search?q=(Saudi+Fintech)+OR+(SAMA+Open+Banking)+OR+(Saudi+payments)+when:48h&hl=en-US&gl=US&ceid=US:en",
         "category": "Fintech Regulations",
     },
     {

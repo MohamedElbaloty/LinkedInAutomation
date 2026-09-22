@@ -16,7 +16,7 @@ from typing import List, Optional
 from bs4 import BeautifulSoup
 import feedparser
 
-from config import AI_RSS_FEEDS, DB_PATH
+from config import AI_RSS_FEEDS, DB_PATH, MAX_ARTICLE_AGE_HOURS
 
 logger = logging.getLogger(__name__)
 
@@ -299,12 +299,31 @@ def calculate_relevance(title: str, summary: str) -> int:
     return score
 
 
-def _parse_published_timestamp(entry: dict) -> float:
-    """Extracts a Unix timestamp from entry date fields for chronological sorting."""
+def _parse_published_timestamp(entry: dict, pub_date_str: str = "") -> float:
+    """Extracts a Unix timestamp from entry date fields or string for chronological sorting."""
     if hasattr(entry, "published_parsed") and entry.published_parsed:
-        return time.mktime(entry.published_parsed)
+        try:
+            return time.mktime(entry.published_parsed)
+        except Exception:
+            pass
     if hasattr(entry, "updated_parsed") and entry.updated_parsed:
-        return time.mktime(entry.updated_parsed)
+        try:
+            return time.mktime(entry.updated_parsed)
+        except Exception:
+            pass
+    if pub_date_str:
+        try:
+            import email.utils
+            dt = email.utils.parsedate_to_datetime(pub_date_str)
+            return dt.timestamp()
+        except Exception:
+            pass
+        try:
+            from dateutil import parser as dt_parser
+            dt = dt_parser.parse(pub_date_str)
+            return dt.timestamp()
+        except Exception:
+            pass
     return 0.0
 
 
@@ -357,12 +376,25 @@ def fetch_unread_articles(feeds: Optional[List[dict]] = None, db_path: Path = DB
                     or datetime.now(timezone.utc).isoformat()
                 )
 
+                pub_timestamp = _parse_published_timestamp(entry, pub_date)
+                now_ts = time.time()
+
+                # STRICT RECENCY FILTER: Discard any news older than MAX_ARTICLE_AGE_HOURS (e.g. 48 hours)
+                if pub_timestamp > 0:
+                    age_hours = (now_ts - pub_timestamp) / 3600.0
+                    if age_hours > MAX_ARTICLE_AGE_HOURS:
+                        logger.debug("Discarding stale article (%.1f hrs old > %d hrs limit): '%s'", age_hours, MAX_ARTICLE_AGE_HOURS, title)
+                        continue
+                    # Extra priority bonus for fresh news published today / yesterday
+                    recency_bonus = 60 if age_hours <= 12 else (35 if age_hours <= 24 else 10)
+                else:
+                    age_hours = 24.0
+                    recency_bonus = 0
+
                 relevance = calculate_relevance(title, summary)
-                # Filter out articles with zero AI relevance
+                # Filter out articles with zero AI/FinTech/PropTech relevance
                 if relevance <= 0:
                     continue
-
-                pub_timestamp = _parse_published_timestamp(entry)
 
                 article = Article(
                     id=article_id,
@@ -371,7 +403,7 @@ def fetch_unread_articles(feeds: Optional[List[dict]] = None, db_path: Path = DB
                     summary=summary,
                     published_at=pub_date,
                     source=feed_name,
-                    relevance_score=(relevance * 1000) + (int((pub_timestamp - 1_700_000_000) / 3600) if pub_timestamp > 0 else 0),
+                    relevance_score=(relevance * 1000) + (recency_bonus * 1000) + (int((pub_timestamp - 1_700_000_000) / 1800) if pub_timestamp > 0 else 0),
                 )
                 candidates.append(article)
 

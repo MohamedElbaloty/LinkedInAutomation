@@ -87,6 +87,11 @@ async function triggerPublishNow() {
         });
     };
 
+    const step3Elem = document.getElementById('step-3');
+    const step4Elem = document.getElementById('step-4');
+    if (step3Elem) step3Elem.textContent = '3. تصميم بطاقة الخبر';
+    if (step4Elem) step4Elem.textContent = '4. النشر على LinkedIn';
+
     updateStep(1, 'جاري فحص الخلاصات واكتشاف أحدث خبر تقني...', 20);
 
     const stepTimer = setTimeout(() => {
@@ -94,8 +99,12 @@ async function triggerPublishNow() {
     }, 4000);
 
     const stepTimer2 = setTimeout(() => {
-        updateStep(3, 'جاري توليد تصميم إنفوجرافيك عالي الدقة عبر Nano Banana Pro...', 75);
-    }, 12000);
+        updateStep(3, 'جاري تصميم بطاقة الخبر الصحفية فائقة الدقة...', 75);
+    }, 10000);
+
+    const stepTimer3 = setTimeout(() => {
+        updateStep(4, 'جاري النشر على LinkedIn وتيليجرام...', 90);
+    }, 18000);
 
     try {
         const response = await fetch('/api/publish-now', {
@@ -105,9 +114,10 @@ async function triggerPublishNow() {
 
         clearTimeout(stepTimer);
         clearTimeout(stepTimer2);
+        clearTimeout(stepTimer3);
 
         const result = await response.json();
-        updateStep(4, 'اكتملت العملية بنجاح!', 100);
+        updateStep(4, 'اكتمل النشر على LinkedIn وتيليجرام بنجاح!', 100);
 
         setTimeout(() => {
             progressBox.style.display = 'none';
@@ -185,15 +195,24 @@ async function triggerPublishTelegram() {
         });
     };
 
+    const step3Elem = document.getElementById('step-3');
+    const step4Elem = document.getElementById('step-4');
+    if (step3Elem) step3Elem.textContent = '3. تصميم بطاقة الخبر';
+    if (step4Elem) step4Elem.textContent = '4. النشر على تيليجرام';
+
     updateStep(1, 'جاري رصد أحدث خبر تقني / فنتك / بروب تك...', 25);
 
     const stepTimer = setTimeout(() => {
-        updateStep(2, 'جاري صياغة ملخص تيليجرام التقني والتحليل...', 50);
+        updateStep(2, 'جاري صياغة ملخص تيليجرام المعماري والتحليل...', 50);
     }, 4000);
 
     const stepTimer2 = setTimeout(() => {
-        updateStep(3, 'جاري إنشاء إنفوجرافيك نانو بانانا برو مع شارة التوقيع...', 75);
-    }, 12000);
+        updateStep(3, 'جاري تصميم بطاقة الخبر الصحفية مع شارة التوقيع...', 75);
+    }, 10000);
+
+    const stepTimer3 = setTimeout(() => {
+        updateStep(4, 'جاري النشر على قناة تيليجرام...', 90);
+    }, 18000);
 
     try {
         const response = await fetch('/api/publish-telegram', {
@@ -203,9 +222,10 @@ async function triggerPublishTelegram() {
 
         clearTimeout(stepTimer);
         clearTimeout(stepTimer2);
+        clearTimeout(stepTimer3);
 
         const result = await response.json();
-        updateStep(4, 'تم الإرسال إلى تيليجرام بنجاح!', 100);
+        updateStep(4, 'تم النشر على تيليجرام بنجاح!', 100);
 
         setTimeout(() => {
             progressBox.style.display = 'none';

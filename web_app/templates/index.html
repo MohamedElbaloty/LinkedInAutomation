@@ -126,21 +126,24 @@
             <div class="comment-action-row">
                 <div class="comment-input-wrapper">
                     <span class="input-icon">🔗</span>
-                    <input type="text" id="target-post-url-input" class="input-text" placeholder="ضع رابط أي منشور على لينكد إن (URL) تريد التعليق عليه، أو اتركه فارغاً للاكتشاف الذكي بالقطاع..." dir="ltr">
+                    <input type="text" id="target-post-url-input" class="input-text" placeholder="ضع رابط أي منشور (عربي أو إنجليزي) ترغب بالتعليق عليه، أو اتركه فارغاً لاستكشاف أخبار اليوم..." dir="ltr">
                 </div>
                 <div class="comment-btn-group">
                     <button class="btn btn-primary btn-glow" id="btn-draft-comment" onclick="triggerDraftComment()">
                         <span class="btn-icon">⚡</span>
-                        <span class="btn-text">اختبار تعليق على خبر / منشور</span>
+                        <span class="btn-text">اختبار تعليق على خبر / منشور (اليوم)</span>
                     </button>
                 </div>
             </div>
 
             <!-- Quick Action Helpers -->
             <div class="comment-quick-actions" id="comment-quick-actions">
-                <span class="quick-actions-label">⚡ تجربة سريعة:</span>
-                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch()">
-                    🔍 استعراض منشورات FinTech & PropTech على LinkedIn ↗️
+                <span class="quick-actions-label">⚡ استكشاف منشورات اليوم:</span>
+                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('fintech')">
+                    🇸🇦 نقاشات FinTech السعودية اليوم (LinkedIn 24h) ↗️
+                </button>
+                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('proptech')">
+                    🏢 نقاشات PropTech السعودية اليوم (LinkedIn 24h) ↗️
                 </button>
                 <button type="button" class="btn-chip" id="btn-chip-my-post" onclick="quickFillMyLatestPost()" style="display: none;">
                     📌 تجربة التعليق على آخر منشور في حسابك
@@ -150,7 +153,7 @@
             <!-- Comment Progress / Loading Spinner -->
             <div class="comment-loading-box" id="comment-loading-box" style="display: none;">
                 <div class="spinner"></div>
-                <span class="loading-text" id="comment-loading-text">جاري فحص المنشور وتوليد تعليق تنفيذي برؤية CTO أصيلة وخالية من الذكاء الاصطناعي...</span>
+                <span class="loading-text" id="comment-loading-text">جاري فهم المنشور وتوليد تعليق تنفيذي احترافي بالإنجليزية (CTO Executive Perspective)...</span>
             </div>
 
             <!-- Interactive Comment Review Box (Shown when drafted) -->
@@ -178,7 +181,7 @@
                         <div class="comment-guidance-box" id="review-comment-guidance" style="display: none;">
                             <span class="guidance-icon">💡</span>
                             <div class="guidance-content">
-                                <strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث الأخبار وتوليد تعليق CTO احترافي عليه.
+                                <strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث أخبار اليوم وتوليد تعليق CTO احترافي عليه بالإنجليزية.
                                 للتعليق الفعلي على لينكد إن، افتح رابط مناقشات الخبر على LinkedIn أعلاه، وانسخ رابط أي منشور من لينكد إن ثم الصقه في المربع واضغط "علق الآن"، أو جرب التعليق على آخر منشور في حسابك.
                             </div>
                         </div>
@@ -188,14 +191,15 @@
                 <div class="review-body">
                     <div class="comment-field-header">
                         <span class="comment-label">
-                            ✍️ نص التعليق المقترح (يمكنك التعديل عليه مباشرة قبل النشر):
+                            ✍️ نص التعليق المقترح بالإنجليزية (Executive English CTO Comment):
                         </span>
                         <div class="comment-badges">
-                            <span class="badge-pill">👤 الحساب: Mohamed Elbaloty (CTO @ Sahalat)</span>
+                            <span class="badge-pill">👤 Mohamed Elbaloty (CTO @ Sahalat)</span>
+                            <span class="badge-pill pill-blue">🇬🇧 Executive English</span>
                             <span class="badge-pill pill-green">🛡️ 100% Anti-AI Persona</span>
                         </div>
                     </div>
-                    <textarea id="review-comment-textarea" class="comment-textarea" rows="4" dir="rtl"></textarea>
+                    <textarea id="review-comment-textarea" class="comment-textarea" rows="4" dir="ltr" style="text-align: left; font-family: var(--font-latin); font-size: 14px; line-height: 1.6;"></textarea>
                 </div>
 
                 <div class="review-actions">

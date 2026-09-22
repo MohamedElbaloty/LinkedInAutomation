@@ -601,8 +601,13 @@ async function triggerPublishComment() {
 }
 
 // Quick Actions
-function openTrendingLinkedInSearch() {
-    const url = 'https://www.linkedin.com/search/results/content/?keywords=%D8%AA%D9%82%D9%86%D9%8A%D8%A9%20%D9%85%D8%A7%D9%84%D9%8A%D8%A9%20%D8%A7%D9%84%D8%B3%D8%B9%D9%88%D8%AF%D9%8A%D8%A9%20OR%20PropTech%20Saudi&sortBy=%22date_posted%22';
+function openTrendingLinkedInSearch(sectorType = 'fintech') {
+    let query = '(Saudi Fintech OR SAMA Open Banking OR STC Pay)';
+    if (sectorType === 'proptech') {
+        query = '(Saudi Proptech OR ROSHN Real Estate OR REGA Saudi)';
+    }
+    const encoded = encodeURIComponent(query);
+    const url = `https://www.linkedin.com/search/results/content/?keywords=${encoded}&datePosted=%22past-24h%22&sortBy=%22date_posted%22`;
     window.open(url, '_blank');
 }
 

@@ -42,8 +42,16 @@ class GenerationResult(BaseModel):
     telegram_caption: str = Field(
         description="A concise version of the news in Arabic (strictly under 950 characters) designed specifically as a single Telegram photo caption."
     )
+    visual_archetype: str = Field(
+        description=(
+            "The creative visual archetype selected specifically for this story: "
+            "choose from ['editorial_hero', 'fintech_liquid_glass', 'proptech_smart_city', 'futuristic_silicon', 'minimalist_data_metric']."
+        )
+    )
     image_prompt: str = Field(
-        description="A detailed English prompt for Google Flow's Nano Banana Pro model creating a professional LinkedIn tech infographic summarizing the news."
+        description=(
+            "A bespoke English prompt crafted according to the chosen visual archetype to produce a breathtaking, modern, scroll-stopping visual for LinkedIn."
+        )
     )
 
     @property
@@ -81,7 +89,8 @@ class AIGenerator:
             "and produce:\n"
             "1. 'linkedin_post': An authoritative, viral, and deeply detailed LinkedIn post (1,500 to 2,500 characters) in clear, modern Arabic blended naturally with standard English technical/business terminology. Do NOT write a superficial summary! Provide deep architectural analysis, regulatory/market context, and actionable takeaways.\n"
             "2. 'telegram_caption': A punchy, condensed version of the post (strictly under 950 characters) suitable as a single Telegram photo caption.\n"
-            "3. 'image_prompt': A bespoke editorial infographic prompt for Google's Nano Banana Pro model.\n\n"
+            "3. 'visual_archetype': The best visual archetype fitting this story from ['editorial_hero', 'fintech_liquid_glass', 'proptech_smart_city', 'futuristic_silicon', 'minimalist_data_metric'].\n"
+            "4. 'image_prompt': A bespoke, scroll-stopping English visual prompt tailored to that archetype.\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
             "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
             "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"
@@ -93,12 +102,32 @@ class AIGenerator:
             "  '📌 المصدر: [اسم المصدر - Source Name] | [عنوان الخبر المرجعي]'\n"
             "- 🏷️ Hashtags: Include targeted hashtags for Saudi, GCC, FinTech, and PropTech:\n"
             "  #فنتك #بروب_تك #التقنية_العقارية #التقنية_المالية #السعودية #رؤية_السعودية_2030 #Fintech #Proptech #SaudiTech #GCC #AI #SoftwareEngineering\n\n"
-            "IMAGE PROMPT DIRECTIVE (LINKEDIN TECHNICAL INFOGRAPHIC FOR NANO BANANA PRO 🍌):\n"
-            "Craft a bespoke English prompt for Google Flow's Nano Banana Pro model instructing it to create a professional LinkedIn tech infographic:\n"
-            "- Command: 'Create a professional LinkedIn tech infographic and visual design about: [Exact News Headline / FinTech / PropTech / AI Breakthrough]'\n"
-            "- News Summary: 'News Summary: [2 to 3 detailed, concrete sentences summarizing the exact news event and technical/economic implications]'\n"
-            "- Structured Visual Sections: 'Visual Layout: [Describe 3 structured concept cards, system flowcharts, financial data cards, or architecture blocks visualizing the key aspects]'\n"
-            "- Design Aesthetics: 'Design Style: Sleek modern corporate tech design for LinkedIn, clean visual hierarchy, data visualization cards, elegant modern typography, high-contrast dark slate aesthetic with glowing cyan and gold accent indicators, premium presentation slide layout, 16:9 widescreen composition.'\n"
+            "SMART DYNAMIC VISUAL ART DIRECTION (LINKEDIN SCROLL-STOPPING VISUALS):\n"
+            "DO NOT create generic, repetitive 3-card infographic slides for every post. "
+            "You are also the Chief Creative Director for Mohamed Elbaloty's personal brand. "
+            "Your visual goal is to create modern, bespoke, editorial-grade visuals (like Wired, Bloomberg Businessweek, Fast Company, or Apple Keynote) "
+            "that immediately captivate executives, founders, and engineers scrolling through their LinkedIn feeds.\n\n"
+            "Select the single best 'visual_archetype' from the 5 options below that most powerfully visualizes this specific story, "
+            "and craft a cinematic, highly detailed English 'image_prompt':\n\n"
+            "1. 'editorial_hero' (Cinematic Magazine Cover / Conceptual Hero Visual):\n"
+            "   - Best for: Landmark AI model announcements, major startup funding rounds ($50M+), sovereign AI initiatives, major strategic shifts.\n"
+            "   - Composition: A stunning 3D conceptual metaphor of the breakthrough. Dramatic volumetric studio lighting, deep obsidian or slate background, warm amber and electric cyan accent lights, shallow depth of field, sleek minimalism. Looks like a premier magazine cover story, NOT a presentation slide.\n\n"
+            "2. 'fintech_liquid_glass' (Futuristic Neo-Banking & Liquid Glassmorphism):\n"
+            "   - Best for: FinTech, SAMA Open Banking, payment platforms (Paymob, Tabby, Tamara, Barq), digital wallets, payment orchestration, banking APIs, embedded finance.\n"
+            "   - Composition: Translucent frosted glassmorphism interface panels floating in 3D space, luminous golden and emerald currency/data streams, holographic payment cards, microchip circuits, isometric banking infrastructure, ultra-luxurious dark mode aesthetic.\n\n"
+            "3. 'proptech_smart_city' (3D Digital Twin & Autonomous Architecture):\n"
+            "   - Best for: PropTech, smart city tech, ROSHN, NEOM The Line, Red Sea Project, real estate tokenization, AI property valuation, REGA platforms.\n"
+            "   - Composition: Photorealistic 3D architectural rendering of futuristic sustainable glass towers in Riyadh or NEOM at twilight, glowing isometric digital twin wireframe layers, holographic floorplan & valuation data HUD overlays, warm sunset reflections on curved glass facades.\n\n"
+            "4. 'futuristic_silicon' (Neural Computing & Quantum Hardware Concept):\n"
+            "   - Best for: LLM inference engines, GPU clusters, chip architecture, autonomous agentic workflows, algorithm benchmarks.\n"
+            "   - Composition: Macro lens perspective of a futuristic glowing silicon quantum wafer, intricate holographic light pathways, translucent glass nodes with data pulses, cinematic chiaroscuro lighting, Apple Pro hardware industrial design.\n\n"
+            "5. 'minimalist_data_metric' (Dark Minimalist Data Art & Stat Highlight):\n"
+            "   - Best for: Market reports, funding amounts (e.g. $329.5M, $50M), percentage leaps (+180%), statistical comparisons.\n"
+            "   - Composition: Ultra-clean dark-mode data visualization inspired by Linear.app and Apple Keynote. Prominent glowing typography for key numbers, sleek circular metric gauges, subtle gradient glow, dark matte backdrop with crisp modern geometric accents.\n\n"
+            "CRITICAL IMAGE PROMPT RULES:\n"
+            "- Do NOT generate a generic 3-card slide presentation unless 'minimalist_data_metric' specifically demands it.\n"
+            "- Format as a 16:9 widescreen composition with ample negative space and cinematic lighting.\n"
+            "- Emphasize modern, premium, high-contrast aesthetics that stop people from scrolling on LinkedIn.\n"
         )
 
         user_content = (
@@ -320,6 +349,7 @@ def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, an
         "post_text": content_result.linkedin_post,
         "linkedin_post": content_result.linkedin_post,
         "telegram_caption": content_result.telegram_caption,
+        "visual_archetype": getattr(content_result, "visual_archetype", "editorial_hero"),
         "image_prompt": content_result.image_prompt,
         "image_path": image_path,
     }

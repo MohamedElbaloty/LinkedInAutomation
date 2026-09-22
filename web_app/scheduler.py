@@ -278,18 +278,22 @@ class GrowthSchedulerService:
                 result["media_type"] = "image"
                 logger.info("No native video found on page. Falling back to Nano Banana Pro studio infographic.")
 
-            # 2. Generate LinkedIn copy and studio infographic if no video
+            # 2. Generate LinkedIn copy and dynamic modern visual if no video
             bundle = await loop.run_in_executor(None, create_ai_bundle, article, has_video)
 
             post_text = bundle.get("linkedin_post") or bundle.get("post_text", "")
             telegram_caption = bundle.get("telegram_caption") or bundle.get("short_hook", "")
+            visual_archetype = bundle.get("visual_archetype", "editorial_hero")
+            result["visual_archetype"] = visual_archetype
+            logger.info("Dynamic Art Direction selected visual archetype: '%s'", visual_archetype)
             media_path = video_path if has_video else (Path(bundle["image_path"]) if bundle.get("image_path") else None)
 
             # 3. Publish to LinkedIn (Safe official REST API or browser fallback)
             logger.info(
-                "Publishing in-depth article to LinkedIn (Total length: %d chars, media: %s)...",
+                "Publishing in-depth article to LinkedIn (Length: %d chars, media: %s, archetype: %s)...",
                 len(post_text),
                 result["media_type"],
+                visual_archetype,
             )
             try:
                 def _publish_lk():
@@ -380,11 +384,14 @@ class GrowthSchedulerService:
                 result["media_type"] = "image"
                 logger.info("No native video found on page. Generating Nano Banana Pro studio infographic for Telegram.")
 
-            # 2. Generate copy and studio infographic if no video
+            # 2. Generate copy and dynamic modern visual if no video
             bundle = await loop.run_in_executor(None, create_ai_bundle, article, has_video)
 
             post_text = bundle.get("linkedin_post") or bundle.get("post_text", "")
             telegram_caption = bundle.get("telegram_caption") or bundle.get("short_hook", "")
+            visual_archetype = bundle.get("visual_archetype", "editorial_hero")
+            result["visual_archetype"] = visual_archetype
+            logger.info("Telegram Dynamic Art Direction selected visual archetype: '%s'", visual_archetype)
             media_path = video_path if has_video else (Path(bundle["image_path"]) if bundle.get("image_path") else None)
 
             # 3. Deliver to Telegram channel / chat (EXCLUSIVELY - NEVER TO LINKEDIN)

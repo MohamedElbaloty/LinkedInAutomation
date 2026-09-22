@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initScheduleChips();
     pollSystemStatus();
     checkLatestPublishedUserPost();
+    loadTrendingTodayTopics();
     // Poll status every 12 seconds
     setInterval(pollSystemStatus, 12000);
 });
@@ -464,6 +465,10 @@ async function triggerDraftComment() {
             const sourceLink = document.getElementById('review-source-link');
             const guidanceBox = document.getElementById('review-comment-guidance');
 
+            const searchTodayLink = document.getElementById('review-linkedin-today-link');
+            const searchKwBadge = document.getElementById('review-search-keyword-badge');
+            const searchKwVal = document.getElementById('review-search-keyword-val');
+
             if (data.is_linkedin_post) {
                 if (typeTag) typeTag.textContent = '📌 منشور LinkedIn مستهدف:';
                 if (urnElem) urnElem.textContent = data.post_urn || 'منشور رسمي على LinkedIn';
@@ -474,17 +479,35 @@ async function triggerDraftComment() {
                 if (linkedinLinkText) {
                     linkedinLinkText.textContent = '🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️';
                 }
+                if (searchTodayLink) searchTodayLink.style.display = 'none';
+                if (searchKwBadge) searchKwBadge.style.display = 'none';
                 if (sourceLink) sourceLink.style.display = 'none';
                 if (guidanceBox) guidanceBox.style.display = 'none';
             } else {
                 if (typeTag) typeTag.textContent = '📰 موضوع قطاعي مقترح للنقاش:';
                 if (urnElem) urnElem.textContent = 'استكشاف قطاعي ذكي';
                 if (linkedinLink) {
-                    linkedinLink.href = data.linkedin_url || 'https://www.linkedin.com/search/results/content/';
+                    linkedinLink.href = data.linkedin_search_url || data.linkedin_url || 'https://www.linkedin.com/search/results/content/';
                     linkedinLink.style.display = 'inline-flex';
                 }
                 if (linkedinLinkText) {
-                    linkedinLinkText.textContent = '🔍 استعراض منشورات النقاش حول هذا الموضوع على LinkedIn ↗️';
+                    linkedinLinkText.textContent = '🔍 استعراض منشورات النقاش على LinkedIn (الأحدث) ↗️';
+                }
+                if (searchTodayLink) {
+                    if (data.linkedin_search_today_url) {
+                        searchTodayLink.href = data.linkedin_search_today_url;
+                        searchTodayLink.style.display = 'inline-flex';
+                    } else {
+                        searchTodayLink.style.display = 'none';
+                    }
+                }
+                if (searchKwBadge && searchKwVal) {
+                    if (data.search_keyword) {
+                        searchKwVal.textContent = data.search_keyword;
+                        searchKwBadge.style.display = 'inline-flex';
+                    } else {
+                        searchKwBadge.style.display = 'none';
+                    }
                 }
                 if (sourceLink) {
                     if (data.source_url) {
@@ -600,14 +623,19 @@ async function triggerPublishComment() {
     }
 }
 
-// Quick Actions
+// Quick Actions - Guaranteed active LinkedIn discussions sorted by date_posted
 function openTrendingLinkedInSearch(sectorType = 'fintech') {
-    let query = '(Saudi Fintech OR SAMA Open Banking OR STC Pay)';
+    let query = '"Saudi Fintech" OR SAMA';
     if (sectorType === 'proptech') {
-        query = '(Saudi Proptech OR ROSHN Real Estate OR REGA Saudi)';
+        query = '"Saudi Proptech" OR ROSHN';
+    } else if (sectorType === 'roshn') {
+        query = 'ROSHN OR "روشن"';
+    } else if (sectorType === 'sama') {
+        query = 'SAMA OR "البنك المركزي السعودي"';
     }
     const encoded = encodeURIComponent(query);
-    const url = `https://www.linkedin.com/search/results/content/?keywords=${encoded}&datePosted=%22past-24h%22&sortBy=%22date_posted%22`;
+    // Sort by date_posted ensures newest posts from today are displayed and zero-results bug is avoided
+    const url = `https://www.linkedin.com/search/results/content/?keywords=${encoded}&sortBy=%22date_posted%22`;
     window.open(url, '_blank');
 }
 
@@ -660,4 +688,62 @@ async function toggleAutoComment(checkbox) {
         console.error('Failed to toggle commenting mode:', e);
         checkbox.checked = !isEnabled;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Today's Hot Topics Loader
+// ---------------------------------------------------------------------------
+async function loadTrendingTodayTopics() {
+    try {
+        const res = await fetch('/api/comment/trending-today');
+        const data = await res.json();
+        const container = document.getElementById('trending-today-section');
+        const grid = document.getElementById('trending-today-grid');
+        if (!container || !grid) return;
+
+        if (data.success && data.topics && data.topics.length > 0) {
+            grid.innerHTML = '';
+            data.topics.forEach(topic => {
+                const card = document.createElement('div');
+                card.className = 'today-topic-card';
+                card.innerHTML = `
+                    <div class="today-topic-header">
+                        <span class="today-topic-badge">${escapeHtml(topic.search_keyword || 'FinTech / PropTech')}</span>
+                        <span style="font-size: 10px; color: var(--text-muted);">${escapeHtml(topic.source || 'أخبار اليوم')}</span>
+                    </div>
+                    <div class="today-topic-title" title="${escapeHtml(topic.title)}">${escapeHtml(topic.clean_title || topic.title)}</div>
+                    <div class="today-topic-actions">
+                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')})">
+                            ⚡ توليد تعليق CTO
+                        </button>
+                        <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض النقاشات على LinkedIn">
+                            🔍 LinkedIn ↗️
+                        </a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            container.style.display = 'block';
+        }
+    } catch (e) {
+        console.warn('Failed to load today trending topics:', e);
+    }
+}
+
+function selectTodayTopic(title) {
+    const input = document.getElementById('target-post-url-input');
+    if (input) {
+        input.value = title;
+        triggerDraftComment();
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }

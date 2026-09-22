@@ -138,16 +138,30 @@
 
             <!-- Quick Action Helpers -->
             <div class="comment-quick-actions" id="comment-quick-actions">
-                <span class="quick-actions-label">⚡ استكشاف منشورات اليوم:</span>
+                <span class="quick-actions-label">⚡ استكشاف منشورات اليوم على LinkedIn:</span>
                 <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('fintech')">
-                    🇸🇦 نقاشات FinTech السعودية اليوم (LinkedIn 24h) ↗️
+                    🇸🇦 نقاشات FinTech السعودية (الأحدث) ↗️
                 </button>
                 <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('proptech')">
-                    🏢 نقاشات PropTech السعودية اليوم (LinkedIn 24h) ↗️
+                    🏢 نقاشات PropTech السعودية (الأحدث) ↗️
+                </button>
+                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('roshn')">
+                    ⚡ نقاشات مشاريع روشن ROSHN ↗️
+                </button>
+                <button type="button" class="btn-chip" onclick="openTrendingLinkedInSearch('sama')">
+                    🏛️ نقاشات SAMA والمصرفية المفتوحة ↗️
                 </button>
                 <button type="button" class="btn-chip" id="btn-chip-my-post" onclick="quickFillMyLatestPost()" style="display: none;">
                     📌 تجربة التعليق على آخر منشور في حسابك
                 </button>
+            </div>
+
+            <!-- Curated Today's FinTech & PropTech Topics List -->
+            <div class="trending-today-section" id="trending-today-section" style="display: none;">
+                <div class="trending-today-title">
+                    <span>🔥 أحدث موضوعات ونقاشات FinTech & PropTech اليوم في المملكة والخليج (اختر للتعليق الفوري):</span>
+                </div>
+                <div class="trending-today-grid" id="trending-today-grid"></div>
             </div>
 
             <!-- Comment Progress / Loading Spinner -->
@@ -171,6 +185,14 @@
                             <a href="#" target="_blank" class="link-external link-linkedin" id="review-linkedin-link">
                                 <span id="review-linkedin-link-text">🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️</span>
                             </a>
+                            <!-- Strict Past-24h Filter Link -->
+                            <a href="#" target="_blank" class="link-external link-today" id="review-linkedin-today-link" style="display: none;">
+                                <span>⏱️ تصفية منشورات الـ 24 ساعة الماضية فقط (Past 24h) ↗️</span>
+                            </a>
+                            <!-- Targeted Search Keyword Badge -->
+                            <span class="badge-search-kw" id="review-search-keyword-badge" style="display: none;">
+                                🏷️ كلمة البحث: <strong id="review-search-keyword-val">ROSHN</strong>
+                            </span>
                             <!-- External News Source Link (Displayed if derived from news feed) -->
                             <a href="#" target="_blank" class="link-external link-source" id="review-source-link" style="display: none;">
                                 <span>📰 مصدر الخبر الأصلي (الموقع الإخباري) ↗️</span>

@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from comment_engine import (
     draft_comment_for_target,
     execute_linkedin_comment,
+    get_today_trending_topics,
     load_comment_settings,
     save_comment_settings,
 )
@@ -311,4 +312,14 @@ async def api_get_latest_post():
     if posts:
         return {"success": True, "post": posts[0]}
     return {"success": False, "post": None}
+
+
+@app.get("/api/comment/trending-today")
+async def api_get_trending_today():
+    """Returns today's curated FinTech and PropTech topics with smart LinkedIn search links."""
+    try:
+        topics = get_today_trending_topics(limit=6)
+        return {"success": True, "topics": topics}
+    except Exception as e:
+        return {"success": False, "error": str(e), "topics": []}
 

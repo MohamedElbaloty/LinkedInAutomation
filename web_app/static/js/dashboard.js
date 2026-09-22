@@ -418,11 +418,85 @@ async function refreshHistory() {
 }
 
 /* ==========================================================================
-   LinkedIn Organic Commenting Engine Client Controller
+   LinkedIn Organic Commenting & Quote Repost Engine Client Controller
    ========================================================================== */
 let currentDraftPost = null;
+let engagementMode = 'comment'; // 'comment' or 'reshare'
 let isDraftingComment = false;
 let isPublishingComment = false;
+let isDraftingReshare = false;
+let isPublishingReshare = false;
+
+function switchEngagementMode(mode) {
+    engagementMode = mode;
+    const tabComment = document.getElementById('tab-mode-comment');
+    const tabReshare = document.getElementById('tab-mode-reshare');
+    const input = document.getElementById('target-post-url-input');
+    const draftBtnText = document.getElementById('btn-draft-text');
+    const draftBtnIcon = document.getElementById('btn-draft-icon');
+    const fieldLabel = document.getElementById('review-field-label');
+    const publishBtn = document.getElementById('btn-publish-comment');
+    const publishIcon = document.getElementById('btn-publish-icon');
+    const publishText = document.getElementById('btn-publish-text');
+    const badgeMode = document.getElementById('review-badge-mode');
+    const guidanceContent = document.getElementById('review-guidance-content');
+
+    if (mode === 'reshare') {
+        if (tabComment) tabComment.classList.remove('active');
+        if (tabReshare) tabReshare.classList.add('active');
+        if (input) {
+            input.placeholder = "ضع رابط المنشور أو المقال الذي تريد إعادة مشاركته مع تحليلك، أو اتركه فارغاً لاختيار تريند اليوم...";
+        }
+        if (draftBtnIcon) draftBtnIcon.textContent = '🚀';
+        if (draftBtnText) draftBtnText.textContent = 'إعداد إعادة المشاركة والتحليل (Quote Repost)';
+        if (fieldLabel) fieldLabel.textContent = '✍️ تحليلك التنفيذي لإعادة المشاركة بالإنجليزية (Quote Repost Commentary):';
+        if (publishIcon) publishIcon.textContent = '🚀';
+        if (publishText) publishText.textContent = 'نشر إعادة المشاركة الآن على حسابك الشخصي';
+        if (publishBtn) publishBtn.classList.add('btn-publish-reshare');
+        if (badgeMode) {
+            badgeMode.textContent = '🚀 Quote Repost';
+            badgeMode.className = 'badge-pill pill-purple';
+        }
+        if (guidanceContent) {
+            guidanceContent.innerHTML = '<strong>توضيح بخصوص إعادة المشاركة (Quote Repost):</strong> سيتم نشر هذا التحليل مباشرة على حسابك الشخصي في LinkedIn مع إرفاق المنشور/المقال الأصلي، مما يعزز ظهور حسابك أمام شبكتك والمهتمين بالقطاع.';
+        }
+    } else {
+        if (tabReshare) tabReshare.classList.remove('active');
+        if (tabComment) tabComment.classList.add('active');
+        if (input) {
+            input.placeholder = "ضع رابط أي منشور (عربي أو إنجليزي) ترغب بالتعليق عليه، أو اتركه فارغاً لاستكشاف أخبار اليوم...";
+        }
+        if (draftBtnIcon) draftBtnIcon.textContent = '⚡';
+        if (draftBtnText) draftBtnText.textContent = 'اختبار تعليق على خبر / منشور (اليوم)';
+        if (fieldLabel) fieldLabel.textContent = '✍️ نص التعليق المقترح بالإنجليزية (Executive English CTO Comment):';
+        if (publishIcon) publishIcon.textContent = '💬';
+        if (publishText) publishText.textContent = 'علق الآن على LinkedIn';
+        if (publishBtn) publishBtn.classList.remove('btn-publish-reshare');
+        if (badgeMode) {
+            badgeMode.textContent = '🇬🇧 Executive English';
+            badgeMode.className = 'badge-pill pill-blue';
+        }
+        if (guidanceContent) {
+            guidanceContent.innerHTML = '<strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث أخبار اليوم وتوليد صياغة CTO احترافية عليه بالإنجليزية. يمكنك تعديل النص ومراجعته بالأسفل، ثم نشره فوراً على لينكد إن بنقرة واحدة!';
+        }
+    }
+}
+
+function triggerEngagementAction() {
+    if (engagementMode === 'reshare') {
+        triggerDraftReshare();
+    } else {
+        triggerDraftComment();
+    }
+}
+
+function triggerEngagementPublish() {
+    if (engagementMode === 'reshare') {
+        triggerPublishReshare();
+    } else {
+        triggerPublishComment();
+    }
+}
 
 async function triggerDraftComment() {
     if (isDraftingComment) return;
@@ -623,6 +697,172 @@ async function triggerPublishComment() {
     }
 }
 
+async function triggerDraftReshare() {
+    if (isDraftingReshare) return;
+    isDraftingReshare = true;
+
+    const urlInput = document.getElementById('target-post-url-input');
+    const draftBtn = document.getElementById('btn-draft-comment');
+    const loadingBox = document.getElementById('comment-loading-box');
+    const loadingText = document.getElementById('comment-loading-text');
+    const reviewBox = document.getElementById('comment-review-box');
+    const alertBox = document.getElementById('comment-alert-box');
+
+    const targetUrl = urlInput ? urlInput.value.trim() : '';
+
+    draftBtn.disabled = true;
+    alertBox.style.display = 'none';
+    reviewBox.style.display = 'none';
+    if (loadingText) {
+        loadingText.textContent = 'جاري تحليل المنشور وصياغة رأي تنفيذي معزز بالهندسة والـ FinTech (Quote Repost)...';
+    }
+    loadingBox.style.display = 'flex';
+
+    try {
+        const response = await fetch('/api/reshare/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_url: targetUrl })
+        });
+
+        const data = await response.json();
+        loadingBox.style.display = 'none';
+        draftBtn.disabled = false;
+        isDraftingReshare = false;
+
+        if (data.success) {
+            currentDraftPost = data;
+
+            document.getElementById('review-target-title').textContent = data.post_title || 'موضوع تقني رائج';
+
+            const urnElem = document.getElementById('review-target-urn');
+            const typeTag = document.getElementById('review-target-type-tag');
+            const linkedinLink = document.getElementById('review-linkedin-link');
+            const linkedinLinkText = document.getElementById('review-linkedin-link-text');
+            const sourceLink = document.getElementById('review-source-link');
+            const guidanceBox = document.getElementById('review-comment-guidance');
+            const searchTodayLink = document.getElementById('review-linkedin-today-link');
+            const searchKwBadge = document.getElementById('review-search-keyword-badge');
+            const searchKwVal = document.getElementById('review-search-keyword-val');
+
+            if (typeTag) typeTag.textContent = '🚀 المنشور / المقال المراد إعادة مشاركته:';
+            if (urnElem) urnElem.textContent = data.post_urn || (data.target_url ? 'رابط مقال / منشور' : 'تريند قطاعي اليوم');
+
+            const viewLink = data.target_url || data.source_url || data.linkedin_search_url || 'https://www.linkedin.com/feed/';
+            if (linkedinLink) {
+                linkedinLink.href = viewLink;
+                linkedinLink.style.display = 'inline-flex';
+            }
+            if (linkedinLinkText) {
+                linkedinLinkText.textContent = data.target_url || data.source_url ? '🔗 فتح المقال / المنشور الأصلي ↗️' : '🔍 استعراض النقاشات على LinkedIn ↗️';
+            }
+            if (sourceLink) {
+                if (data.source_url) {
+                    sourceLink.href = data.source_url;
+                    sourceLink.style.display = 'inline-flex';
+                } else {
+                    sourceLink.style.display = 'none';
+                }
+            }
+            if (searchTodayLink) searchTodayLink.style.display = 'none';
+            if (searchKwBadge && searchKwVal) {
+                if (data.search_keyword) {
+                    searchKwVal.textContent = data.search_keyword;
+                    searchKwBadge.style.display = 'inline-flex';
+                } else {
+                    searchKwBadge.style.display = 'none';
+                }
+            }
+            if (guidanceBox) guidanceBox.style.display = 'flex';
+
+            const textarea = document.getElementById('review-comment-textarea');
+            if (textarea) {
+                textarea.value = data.commentary || '';
+            }
+
+            reviewBox.style.display = 'block';
+            reviewBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alertBox.className = 'comment-alert-box error';
+            alertBox.innerHTML = `<strong>⚠️ تنبيه:</strong> ${data.error || 'تعذر صياغة إعادة المشاركة.'}`;
+            alertBox.style.display = 'block';
+        }
+    } catch (err) {
+        loadingBox.style.display = 'none';
+        draftBtn.disabled = false;
+        isDraftingReshare = false;
+        alertBox.className = 'comment-alert-box error';
+        alertBox.innerHTML = `<strong>❌ خطأ في الاتصال:</strong> ${err.message}`;
+        alertBox.style.display = 'block';
+    }
+}
+
+async function triggerPublishReshare() {
+    if (isPublishingReshare || !currentDraftPost) return;
+    isPublishingReshare = true;
+
+    const publishBtn = document.getElementById('btn-publish-comment');
+    const textarea = document.getElementById('review-comment-textarea');
+    const alertBox = document.getElementById('comment-alert-box');
+
+    const commentary = textarea ? textarea.value.trim() : '';
+    if (!commentary) {
+        alert('الرجاء التأكد من وجود نص التحليل قبل إعادة المشاركة.');
+        isPublishingReshare = false;
+        return;
+    }
+
+    publishBtn.disabled = true;
+    publishBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> جاري نشر إعادة المشاركة على حسابك...';
+    alertBox.style.display = 'none';
+
+    try {
+        const target = currentDraftPost.post_urn || currentDraftPost.target_url || currentDraftPost.source_url || '';
+        const response = await fetch('/api/reshare/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                target_urn_or_url: target,
+                commentary: commentary,
+                post_title: currentDraftPost.post_title
+            })
+        });
+
+        const result = await response.json();
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = '<span class="btn-icon" id="btn-publish-icon">🚀</span><span class="btn-text" id="btn-publish-text">نشر إعادة المشاركة الآن على حسابك الشخصي</span>';
+        isPublishingReshare = false;
+
+        if (result.success) {
+            const viewUrl = result.public_url || 'https://www.linkedin.com/feed/';
+            alertBox.className = 'comment-alert-box success';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 6px;">🎉 تم نشر إعادة المشاركة (Quote Repost) بنجاح على حسابك في LinkedIn!</div>
+                <div style="font-size: 13px; margin-bottom: 12px;">📰 المنشور / الموضوع: <strong>${escapeHtml(currentDraftPost.post_title)}</strong></div>
+                <a href="${viewUrl}" target="_blank" class="btn btn-secondary" style="padding: 8px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                    🔗 اضغط هنا لفتح المنشور على حسابك في LinkedIn ومشاهدته مباشرة ↗️
+                </a>
+            `;
+            alertBox.style.display = 'block';
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alertBox.className = 'comment-alert-box error';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 4px;">⚠️ تنبيه أثناء نشر إعادة المشاركة:</div>
+                <div style="font-size: 13px;">${result.error || 'تعذر إرسال المنشور إلى LinkedIn. تأكد من صلاحية الـ Access Token.'}</div>
+            `;
+            alertBox.style.display = 'block';
+        }
+    } catch (err) {
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = '<span class="btn-icon" id="btn-publish-icon">🚀</span><span class="btn-text" id="btn-publish-text">نشر إعادة المشاركة الآن على حسابك الشخصي</span>';
+        isPublishingReshare = false;
+        alertBox.className = 'comment-alert-box error';
+        alertBox.innerHTML = `<strong>❌ خطأ غير متوقع:</strong> ${err.message}`;
+        alertBox.style.display = 'block';
+    }
+}
+
 // Quick Actions - Guaranteed active LinkedIn discussions sorted by date_posted
 function openTrendingLinkedInSearch(sectorType = 'fintech') {
     let query = '"Saudi Fintech" OR SAMA';
@@ -713,8 +953,11 @@ async function loadTrendingTodayTopics() {
                     </div>
                     <div class="today-topic-title" title="${escapeHtml(topic.title)}">${escapeHtml(topic.clean_title || topic.title)}</div>
                     <div class="today-topic-actions">
-                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')})">
-                            ⚡ توليد تعليق CTO
+                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, 'comment')" title="توليد تعليق CTO مباشر">
+                            💬 تعليق CTO
+                        </button>
+                        <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
+                            🚀 مشاركة وتحليل
                         </button>
                         <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض النقاشات على LinkedIn">
                             🔍 LinkedIn ↗️
@@ -730,11 +973,12 @@ async function loadTrendingTodayTopics() {
     }
 }
 
-function selectTodayTopic(title) {
+function selectTodayTopic(title, mode = 'comment') {
+    switchEngagementMode(mode);
     const input = document.getElementById('target-post-url-input');
     if (input) {
         input.value = title;
-        triggerDraftComment();
+        triggerEngagementAction();
     }
 }
 
@@ -747,3 +991,4 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+

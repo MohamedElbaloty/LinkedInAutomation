@@ -19,7 +19,9 @@ from pydantic import BaseModel
 
 from comment_engine import (
     draft_comment_for_target,
+    draft_reshare_for_target,
     execute_linkedin_comment,
+    execute_linkedin_reshare,
     get_today_trending_topics,
     load_comment_settings,
     save_comment_settings,
@@ -91,6 +93,17 @@ class CommentPublishRequest(BaseModel):
 
 class CommentToggleRequest(BaseModel):
     enabled: bool
+
+
+class ReshareDraftRequest(BaseModel):
+    target_url: Optional[str] = None
+    target_text: Optional[str] = None
+
+
+class ResharePublishRequest(BaseModel):
+    target_urn_or_url: str
+    commentary: str
+    post_title: Optional[str] = None
 
 
 def get_posted_history(limit: int = 15) -> List[Dict[str, str]]:
@@ -322,4 +335,41 @@ async def api_get_trending_today():
         return {"success": True, "topics": topics}
     except Exception as e:
         return {"success": False, "error": str(e), "topics": []}
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn Thought Leadership & Quote Repost (Reshare) APIs
+# ---------------------------------------------------------------------------
+
+@app.post("/api/reshare/draft")
+async def api_draft_reshare(data: ReshareDraftRequest):
+    """
+    Drafts an authentic, high-impact executive reshare commentary (Quote Repost)
+    by Mohamed Elbaloty (CTO @ Sahalat) for a targeted post or today's trending topic.
+    """
+    try:
+        res = draft_reshare_for_target(
+            target_url_or_urn=data.target_url or "",
+            target_text=data.target_text or "",
+        )
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/api/reshare/publish")
+async def api_publish_reshare(data: ResharePublishRequest):
+    """
+    Publishes a live Quote Repost / Reshare on LinkedIn via official REST API.
+    """
+    try:
+        res = execute_linkedin_reshare(
+            commentary=data.commentary,
+            target_urn_or_url=data.target_urn_or_url,
+            post_title=data.post_title or "",
+        )
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
 

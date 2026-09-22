@@ -474,6 +474,149 @@ class LinkedInAPIClient:
             "method": "official_api",
         }
 
+    def reshare_post(
+        self,
+        commentary: str,
+        parent_urn: Optional[str] = None,
+        article_url: Optional[str] = None,
+        article_title: Optional[str] = None,
+        article_description: Optional[str] = None,
+    ) -> Dict[str, any]:
+        """
+        Reshares an existing post or authoritative news article on LinkedIn with executive commentary (Quote Repost).
+        Implements a resilient three-tier strategy:
+        1. Native reshareContext: {"parent": parent_urn} (for native LinkedIn post URNs).
+        2. Embedded Article: content: {"article": {"source": article_url, "title": article_title}}
+        3. Enhanced Text Post: Commentary with source link gracefully appended.
+        """
+        if not self.person_urn:
+            self.fetch_my_profile_urn()
+
+        escaped_commentary = escape_linkedin_commentary(commentary)
+        url = f"{LINKEDIN_API_BASE}/rest/posts"
+
+        # Tier 1: Try native reshareContext if a LinkedIn post URN is available
+        clean_parent = (parent_urn or "").strip()
+        if clean_parent:
+            if not clean_parent.startswith("urn:li:"):
+                if clean_parent.isdigit():
+                    clean_parent = f"urn:li:share:{clean_parent}"
+            
+            share_candidate = clean_parent
+            if clean_parent.startswith("urn:li:activity:"):
+                share_candidate = clean_parent.replace("urn:li:activity:", "urn:li:share:")
+
+            payload = {
+                "author": self.person_urn,
+                "commentary": escaped_commentary,
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False,
+                "reshareContext": {
+                    "parent": share_candidate
+                }
+            }
+            try:
+                resp = self._request_with_version_retry("POST", url, json=payload, timeout=25)
+                if resp.status_code in (200, 201):
+                    post_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
+                    public_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else "https://www.linkedin.com/feed/"
+                    logger.info("Native Quote Repost published successfully! URN: %s", post_urn)
+                    if post_urn:
+                        record_published_linkedin_post(urn=post_urn, public_url=public_url, title=commentary[:100])
+                    return {
+                        "success": True,
+                        "post_urn": post_urn,
+                        "public_url": public_url,
+                        "method": "native_reshare",
+                    }
+                else:
+                    logger.warning("Native reshareContext returned status %s: %s. Falling back to article share.", resp.status_code, resp.text)
+            except Exception as reshare_err:
+                logger.warning("Native reshareContext failed (%s). Falling back.", reshare_err)
+
+        # Tier 2: Article / Link Share with Commentary
+        target_link = article_url or (
+            f"https://www.linkedin.com/feed/update/{clean_parent}" if clean_parent else ""
+        )
+        if target_link and (target_link.startswith("http://") or target_link.startswith("https://")):
+            payload_article = {
+                "author": self.person_urn,
+                "commentary": escaped_commentary,
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False,
+                "content": {
+                    "article": {
+                        "source": target_link,
+                        "title": article_title or "FinTech & PropTech Regional Executive Insights",
+                        "description": article_description or "Executive analysis by Mohamed Elbaloty (CTO @ Sahalat)"
+                    }
+                }
+            }
+            try:
+                resp = self._request_with_version_retry("POST", url, json=payload_article, timeout=25)
+                if resp.status_code in (200, 201):
+                    post_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
+                    public_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else "https://www.linkedin.com/feed/"
+                    logger.info("Article share published successfully! URN: %s", post_urn)
+                    if post_urn:
+                        record_published_linkedin_post(urn=post_urn, public_url=public_url, title=commentary[:100])
+                    return {
+                        "success": True,
+                        "post_urn": post_urn,
+                        "public_url": public_url,
+                        "method": "article_share",
+                    }
+                else:
+                    logger.warning("Article share returned status %s: %s. Falling back to text post.", resp.status_code, resp.text)
+            except Exception as art_err:
+                logger.warning("Article share failed (%s). Falling back.", art_err)
+
+        # Tier 3: Text Post with Source Link Appended
+        full_commentary = escaped_commentary
+        if target_link:
+            full_commentary = f"{escaped_commentary}\n\n🔗 Reference & Original Discussion:\n{target_link}"
+
+        payload_text = {
+            "author": self.person_urn,
+            "commentary": full_commentary,
+            "visibility": "PUBLIC",
+            "distribution": {
+                "feedDistribution": "MAIN_FEED",
+                "targetEntities": [],
+                "thirdPartyDistributionChannels": []
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": False
+        }
+        resp = self._request_with_version_retry("POST", url, json=payload_text, timeout=25)
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(f"Failed to publish reshare on LinkedIn: {resp.status_code} - {resp.text}")
+
+        post_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
+        public_url = f"https://www.linkedin.com/feed/update/{post_urn}" if post_urn else "https://www.linkedin.com/feed/"
+        logger.info("Reshare published as post successfully! URN: %s", post_urn)
+        if post_urn:
+            record_published_linkedin_post(urn=post_urn, public_url=public_url, title=commentary[:100])
+
+        return {
+            "success": True,
+            "post_urn": post_urn,
+            "public_url": public_url,
+            "method": "text_post_fallback",
+        }
+
     def create_comment(self, target_urn_or_url: str, comment_text: str) -> Dict[str, any]:
         """
         Publishes a top-level executive comment on a target LinkedIn post using the official Social Actions REST API.

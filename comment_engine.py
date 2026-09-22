@@ -195,6 +195,82 @@ class CommentGenerator:
             "and ensuring payment gateways and Open Banking APIs maintain sub-second idempotency during high-volume transaction spikes."
         )
 
+    def generate_reshare_commentary(
+        self,
+        post_content: str,
+        post_title: str = "",
+        post_author: str = "",
+        sector: str = "FinTech & PropTech (Saudi Arabia & GCC)",
+    ) -> str:
+        """
+        Drafts a high-impact, authentic executive post commentary to reshare (Quote Repost / Share with thoughts)
+        a trending post or breaking news on LinkedIn.
+        Appears on Mohamed Elbaloty's personal profile (CTO @ Sahalat) to drive organic profile reach.
+        """
+        system_instruction = (
+            "You are Mohamed Elbaloty, CTO @ Sahalat. You are an experienced engineering executive, enterprise software architect, "
+            "and technical authority in FinTech (التقنية المالية) and PropTech (التقنية العقارية) across Saudi Arabia and the GCC.\n\n"
+            "YOUR OBJECTIVE:\n"
+            "Write a high-impact, authentic executive post commentary to reshare (Quote Repost / Share with thoughts) a trending post or breaking news in your industry on LinkedIn.\n"
+            "This post will be published on your personal LinkedIn profile to attract founders, CTOs, engineers, and investors.\n"
+            "It must sound 100% human, authoritative, and strategic. NEVER look or sound like AI-generated content.\n\n"
+            "STRUCTURE OF THE RESHARE COMMENTARY:\n"
+            "1. THE HOOK: A bold, insightful opening statement about why this development matters for the Saudi/GCC tech ecosystem.\n"
+            "2. THE ENGINEERING / OPERATIONAL REALITY: 2 to 3 concise, punchy paragraphs addressing specific architectural, regulatory, or economic mechanics (e.g., SAMA Open Banking sandbox, instant escrow reconciliation, REGA title deed APIs, payment gateway latency, AVM model drift, or cross-border KYC).\n"
+            "3. THE EXECUTIVE TAKEAWAY: A clear perspective on where the market or infrastructure is heading.\n"
+            "4. CALL TO ENGAGEMENT: A brief, natural question prompting peers and tech leaders to share their thoughts.\n"
+            "5. HASHTAGS: Exactly 3 to 4 focused hashtags at the very end (e.g. #SaudiFintech #PropTech #Vision2030 #FintechSaudi).\n\n"
+            "STRICT RULES:\n"
+            "- LANGUAGE: MUST BE WRITTEN IN NATURAL, FLUENT, EXECUTIVE ENGLISH.\n"
+            "- NO BOT INTROS: Do not start with 'Check this out', 'Excited to share', 'Interesting read', 'In today's fast-paced world', or 'As CTO of Sahalat'.\n"
+            "- NO AI BUZZWORDS: Banned words: 'game-changer', 'revolutionize', 'testament', 'tapestry', 'delve', 'beacon', 'unleash', 'cornerstone'.\n"
+            "- TONE: Pragmatic, technical, confident, peer-to-peer executive discussion.\n"
+            "- LENGTH: Around 90 to 140 words. Well-spaced with short paragraphs for high LinkedIn readability."
+        )
+
+        user_prompt = (
+            f"Target Post / Breaking News Topic: {post_title}\n"
+            f"Author / Organization: {post_author or 'Industry Leader'}\n"
+            f"Industry Focus: {sector} (Saudi Arabia & GCC - Published Today)\n"
+            f"Post Content:\n{post_content}\n\n"
+            "Deeply comprehend the subject above. Author your high-impact CTO executive reshare post commentary in English now:"
+        )
+
+        candidate_models = [
+            "gemini-3.6-flash",
+            self.text_model,
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3-flash-preview",
+        ]
+        candidate_models = list(dict.fromkeys(candidate_models))
+
+        for model_name in candidate_models:
+            try:
+                resp = self.client.models.generate_content(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.7,
+                        max_output_tokens=1024,
+                    ),
+                )
+                raw_text = resp.text.strip()
+                if raw_text:
+                    return clean_anti_ai_comment(raw_text)
+            except Exception as e:
+                logger.warning("Reshare commentary generation failed on %s: %s", model_name, e)
+                continue
+
+        # Pragmatic fallback
+        return (
+            "Regional tech adoption in the GCC has officially transitioned from UI-level innovation to deep infrastructure integration.\n\n"
+            "Connecting sovereign registries directly into private payment rails demands resilient webhook topologies and strict idempotency across all settlement touchpoints.\n\n"
+            "What's your biggest technical hurdle when integrating real-time sovereign APIs into private workflows?\n\n"
+            "#SaudiFintech #PropTech #Vision2030 #FintechSaudi"
+        )
+
 
 def extract_smart_linkedin_keywords(title: str, text: str = "") -> str:
     """
@@ -547,6 +623,161 @@ def execute_linkedin_comment(
     history = settings.get("history", [])
     history.insert(0, history_item)
     settings["history"] = history[:30]  # Keep last 30 comments
-    save_comment_settings(settings)
+    return res
+
+
+def draft_reshare_for_target(
+    target_url_or_urn: str = "",
+    target_text: str = "",
+    target_title: str = "",
+) -> Dict[str, any]:
+    """
+    Orchestrates drafting a Quote Repost / Reshare with executive commentary:
+    1. Resolves target post / topic (or discovers today's top trending FinTech/PropTech topic).
+    2. Drafts high-reach executive reshare commentary from Mohamed Elbaloty (CTO @ Sahalat).
+    3. Prepares URN and article links for live LinkedIn publishing.
+    """
+    resolved_url = target_url_or_urn.strip()
+    resolved_text = target_text.strip()
+    resolved_title = target_title.strip()
+    source_name = ""
+    source_url = None
+    target_urn = ""
+    is_linkedin_post = False
+
+    is_explicit_linkedin = (
+        "linkedin.com" in resolved_url
+        or resolved_url.startswith("urn:li:")
+        or (resolved_url.isdigit() and len(resolved_url) >= 15)
+    )
+    is_http_url = resolved_url.startswith("http://") or resolved_url.startswith("https://")
+
+    if resolved_url and not is_explicit_linkedin and not is_http_url:
+        if not resolved_text:
+            resolved_text = resolved_url
+        resolved_url = ""
+
+    if is_explicit_linkedin:
+        is_linkedin_post = True
+        target_urn = extract_urn_from_linkedin_url(resolved_url)
+        source_url = resolved_url
+        if not resolved_text:
+            slug_match = re.search(r"linkedin\.com/posts/([^/?]+)", resolved_url)
+            if slug_match:
+                slug = slug_match.group(1).replace("-", " ")
+                resolved_title = f"منشور تقني: {slug[:60]}"
+                resolved_text = f"نقاش قطاعي حول: {slug}"
+            else:
+                resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
+                resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
+        source_name = "LinkedIn Post"
+        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        urls = build_linkedin_search_urls(search_kw)
+        linkedin_search_url = urls["search_url"]
+    elif resolved_url and is_http_url:
+        is_linkedin_post = False
+        source_url = resolved_url
+        if not resolved_title:
+            resolved_title = "مقال تقني رائج في التقنية المالية والبروبتيك"
+        source_name = "Industry Source"
+        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        urls = build_linkedin_search_urls(search_kw)
+        linkedin_search_url = urls["search_url"]
+    elif resolved_text:
+        is_linkedin_post = False
+        if not resolved_title:
+            resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "")
+        source_name = "User Shared Topic"
+        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        urls = build_linkedin_search_urls(search_kw)
+        linkedin_search_url = urls["search_url"]
+    else:
+        # Discover today's top trending topic
+        trending = discover_trending_sector_post()
+        resolved_title = trending["title"]
+        resolved_text = trending["post_text"]
+        source_name = trending["source"]
+        source_url = trending.get("source_url")
+        search_kw = trending.get("search_keyword", "Saudi Fintech")
+        linkedin_search_url = trending.get("linkedin_search_url", "")
+        is_linkedin_post = False
+
+    generator = CommentGenerator()
+    commentary = generator.generate_reshare_commentary(
+        post_content=resolved_text or resolved_title,
+        post_title=resolved_title,
+        post_author=source_name,
+    )
+
+    return {
+        "success": True,
+        "mode": "reshare",
+        "post_title": resolved_title,
+        "post_urn": target_urn if is_linkedin_post else None,
+        "target_url": source_url or "",
+        "source_url": source_url,
+        "source_name": source_name,
+        "search_keyword": search_kw,
+        "linkedin_search_url": linkedin_search_url,
+        "post_content_snippet": resolved_text[:280] + ("..." if len(resolved_text) > 280 else ""),
+        "commentary": commentary,
+        "author_persona": "Mohamed Elbaloty, CTO @ Sahalat",
+    }
+
+
+def execute_linkedin_reshare(
+    commentary: str,
+    target_urn_or_url: str = "",
+    post_title: str = "",
+) -> Dict[str, any]:
+    """
+    Executes a live reshare / quote repost on LinkedIn via official REST API.
+    Updates daily reshares count and records audit history in comment_settings.json.
+    """
+    from linkedin_api import LinkedInAPIClient
+
+    client = LinkedInAPIClient()
+    target = target_urn_or_url.strip()
+    parent_urn = None
+    article_url = None
+
+    if target.startswith("urn:li:") or ("linkedin.com" in target and ("/posts/" in target or "/update/" in target or "/feed/" in target)):
+        parent_urn = extract_urn_from_linkedin_url(target) if "linkedin.com" in target else target
+    elif target.startswith("http://") or target.startswith("https://"):
+        article_url = target
+
+    res = client.reshare_post(
+        commentary=commentary,
+        parent_urn=parent_urn,
+        article_url=article_url or target,
+        article_title=post_title or "FinTech & PropTech Regional Executive Insights",
+    )
+
+    if res.get("success"):
+        settings = load_comment_settings()
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        if settings.get("last_comment_date") != today_str:
+            settings["comments_today"] = 0
+            settings["reshares_today"] = 0
+            settings["last_comment_date"] = today_str
+
+        settings["reshares_today"] = settings.get("reshares_today", 0) + 1
+        settings["last_reshare_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        history_item = {
+            "type": "reshare",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "target_urn": parent_urn,
+            "target_url": target,
+            "post_title": post_title,
+            "commentary_snippet": commentary[:120] + "...",
+            "published_urn": res.get("post_urn"),
+            "public_url": res.get("public_url"),
+            "method": res.get("method"),
+            "success": True,
+        }
+        history = settings.get("history", [])
+        history.insert(0, history_item)
+        settings["history"] = history[:50]
+        save_comment_settings(settings)
 
     return res

@@ -1321,3 +1321,87 @@ input:checked + .slider::before {
     background: rgba(16, 185, 129, 0.3);
     color: #ffffff;
 }
+
+.btn-topic-action.btn-topic-reshare {
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    border-color: rgba(14, 165, 233, 0.35);
+}
+
+.btn-topic-action.btn-topic-reshare:hover {
+    background: rgba(14, 165, 233, 0.35);
+    color: #ffffff;
+}
+
+.badge-pill.pill-purple {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.3);
+}
+
+/* Engagement Mode Tabs (Comment vs Reshare) */
+.engagement-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-glass);
+    width: fit-content;
+}
+
+.engagement-tab-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-arabic);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.engagement-tab-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.engagement-tab-btn.active {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.4);
+}
+
+.btn-publish-reshare {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-arabic);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+}
+
+.btn-publish-reshare:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.5);
+}
+
+.btn-publish-reshare:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}

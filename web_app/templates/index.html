@@ -122,16 +122,26 @@
                 </div>
             </div>
 
+            <!-- Engagement Mode Selector Tabs (Comment vs Reshare) -->
+            <div class="engagement-tabs">
+                <button type="button" class="engagement-tab-btn active" id="tab-mode-comment" onclick="switchEngagementMode('comment')">
+                    <span>💬 تعليق تنفيذي (Direct Comment)</span>
+                </button>
+                <button type="button" class="engagement-tab-btn" id="tab-mode-reshare" onclick="switchEngagementMode('reshare')">
+                    <span>🚀 إعادة مشاركة وتحليل تريند (Quote Repost)</span>
+                </button>
+            </div>
+
             <!-- Input / Action Row -->
             <div class="comment-action-row">
                 <div class="comment-input-wrapper">
-                    <span class="input-icon">🔗</span>
+                    <span class="input-icon" id="input-mode-icon">🔗</span>
                     <input type="text" id="target-post-url-input" class="input-text" placeholder="ضع رابط أي منشور (عربي أو إنجليزي) ترغب بالتعليق عليه، أو اتركه فارغاً لاستكشاف أخبار اليوم..." dir="ltr">
                 </div>
                 <div class="comment-btn-group">
-                    <button class="btn btn-primary btn-glow" id="btn-draft-comment" onclick="triggerDraftComment()">
-                        <span class="btn-icon">⚡</span>
-                        <span class="btn-text">اختبار تعليق على خبر / منشور (اليوم)</span>
+                    <button class="btn btn-primary btn-glow" id="btn-draft-comment" onclick="triggerEngagementAction()">
+                        <span class="btn-icon" id="btn-draft-icon">⚡</span>
+                        <span class="btn-text" id="btn-draft-text">اختبار تعليق على خبر / منشور (اليوم)</span>
                     </button>
                 </div>
             </div>
@@ -159,7 +169,7 @@
             <!-- Curated Today's FinTech & PropTech Topics List -->
             <div class="trending-today-section" id="trending-today-section" style="display: none;">
                 <div class="trending-today-title">
-                    <span>🔥 أحدث موضوعات ونقاشات FinTech & PropTech اليوم في المملكة والخليج (اختر للتعليق الفوري):</span>
+                    <span>🔥 أحدث موضوعات ونقاشات FinTech & PropTech اليوم في المملكة والخليج (اختر للتعليق أو إعادة المشاركة):</span>
                 </div>
                 <div class="trending-today-grid" id="trending-today-grid"></div>
             </div>
@@ -167,10 +177,10 @@
             <!-- Comment Progress / Loading Spinner -->
             <div class="comment-loading-box" id="comment-loading-box" style="display: none;">
                 <div class="spinner"></div>
-                <span class="loading-text" id="comment-loading-text">جاري فهم المنشور وتوليد تعليق تنفيذي احترافي بالإنجليزية (CTO Executive Perspective)...</span>
+                <span class="loading-text" id="comment-loading-text">جاري فهم المنشور وتوليد تحليل تنفيذي احترافي بالإنجليزية (CTO Executive Perspective)...</span>
             </div>
 
-            <!-- Interactive Comment Review Box (Shown when drafted) -->
+            <!-- Interactive Engagement Review Box (Shown when drafted) -->
             <div class="comment-review-box" id="comment-review-box" style="display: none;">
                 <div class="review-header">
                     <div class="post-preview-info">
@@ -202,9 +212,9 @@
                         <!-- Guidance Notice when target is a news topic -->
                         <div class="comment-guidance-box" id="review-comment-guidance" style="display: none;">
                             <span class="guidance-icon">💡</span>
-                            <div class="guidance-content">
-                                <strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث أخبار اليوم وتوليد تعليق CTO احترافي عليه بالإنجليزية.
-                                للتعليق الفعلي على لينكد إن، افتح رابط مناقشات الخبر على LinkedIn أعلاه، وانسخ رابط أي منشور من لينكد إن ثم الصقه في المربع واضغط "علق الآن"، أو جرب التعليق على آخر منشور في حسابك.
+                            <div class="guidance-content" id="review-guidance-content">
+                                <strong>توضيح بخصوص النشر:</strong> هذا الموضوع تم استكشافه من أحدث أخبار اليوم وتوليد صياغة CTO احترافية عليه بالإنجليزية.
+                                يمكنك تعديل النص ومراجعته بالأسفل، ثم نشره فوراً على لينكد إن بنقرة واحدة!
                             </div>
                         </div>
                     </div>
@@ -212,24 +222,24 @@
 
                 <div class="review-body">
                     <div class="comment-field-header">
-                        <span class="comment-label">
+                        <span class="comment-label" id="review-field-label">
                             ✍️ نص التعليق المقترح بالإنجليزية (Executive English CTO Comment):
                         </span>
                         <div class="comment-badges">
                             <span class="badge-pill">👤 Mohamed Elbaloty (CTO @ Sahalat)</span>
-                            <span class="badge-pill pill-blue">🇬🇧 Executive English</span>
+                            <span class="badge-pill pill-blue" id="review-badge-mode">🇬🇧 Executive English</span>
                             <span class="badge-pill pill-green">🛡️ 100% Anti-AI Persona</span>
                         </div>
                     </div>
-                    <textarea id="review-comment-textarea" class="comment-textarea" rows="4" dir="ltr" style="text-align: left; font-family: var(--font-latin); font-size: 14px; line-height: 1.6;"></textarea>
+                    <textarea id="review-comment-textarea" class="comment-textarea" rows="6" dir="ltr" style="text-align: left; font-family: var(--font-latin); font-size: 14px; line-height: 1.6;"></textarea>
                 </div>
 
                 <div class="review-actions">
-                    <button class="btn btn-publish-comment btn-glow" id="btn-publish-comment" onclick="triggerPublishComment()">
-                        <span class="btn-icon">💬</span>
-                        <span class="btn-text">علق الآن على LinkedIn</span>
+                    <button class="btn btn-publish-comment btn-glow" id="btn-publish-comment" onclick="triggerEngagementPublish()">
+                        <span class="btn-icon" id="btn-publish-icon">💬</span>
+                        <span class="btn-text" id="btn-publish-text">علق الآن على LinkedIn</span>
                     </button>
-                    <button class="btn btn-secondary" onclick="triggerDraftComment()">
+                    <button class="btn btn-secondary" onclick="triggerEngagementAction()">
                         <span>🔄 توليد صياغة أخرى</span>
                     </button>
                 </div>

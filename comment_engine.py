@@ -349,10 +349,30 @@ def build_linkedin_search_urls(keywords: str) -> Dict[str, str]:
     }
 
 
+DISALLOWED_TOPIC_TERMS = {
+    "houthi", "war", "missile", "drone", "military", "strike", "attack", "israel",
+    "gaza", "yemen", "weapons", "killed", "casualt", "clash", "bomb", "army",
+}
+
+SECTOR_RELEVANCE_TERMS = {
+    "fintech", "proptech", "real estate", "bank", "sama", "payment", "escrow",
+    "deed", "roshn", "tech", "digital", "startup", "invest", "funding", "saudi",
+    "gcc", "uae", "market", "wealth", "asset", "open banking", "sarie", "phonepe",
+}
+
+
+def is_valid_trending_topic(title: str, summary: str) -> bool:
+    combined = f"{title} {summary}".lower()
+    if any(bad in combined for bad in DISALLOWED_TOPIC_TERMS):
+        return False
+    return any(term in combined for term in SECTOR_RELEVANCE_TERMS)
+
+
 def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
     """
     Fetches the top unread/fresh articles from regional Saudi & GCC FinTech & PropTech feeds (today),
     extracts smart LinkedIn search URLs, and returns structured topic items for the dashboard.
+    Strictly filters out non-industry or geopolitical/military news.
     """
     articles = fetch_unread_articles(feeds=SAUDI_GCC_TODAY_FEEDS)
     if not articles:
@@ -361,7 +381,11 @@ def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
     topics = []
     seen_titles = set()
     seen_keywords = set()
+
     for art in articles:
+        if not is_valid_trending_topic(art.title, art.summary or ""):
+            continue
+
         clean_title = re.sub(r"[-|–—].*$", "", art.title).strip()
         if clean_title.lower() in seen_titles:
             continue
@@ -399,6 +423,8 @@ def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
     # If we need more topics to fill the limit, do a second pass allowing same keyword
     if len(topics) < limit:
         for art in articles:
+            if not is_valid_trending_topic(art.title, art.summary or ""):
+                continue
             clean_title = re.sub(r"[-|–—].*$", "", art.title).strip()
             if clean_title.lower() in seen_titles:
                 continue
@@ -459,14 +485,17 @@ def draft_comment_for_target(
     target_url_or_urn: str = "",
     target_text: str = "",
     target_title: str = "",
+    search_keyword: str = "",
+    linkedin_search_url: str = "",
+    linkedin_search_today_url: str = "",
 ) -> Dict[str, any]:
     """
     High-level orchestrator that:
     1. Resolves target post:
        - If user entered a real LinkedIn post URL -> extracts URN, points directly to that post.
+       - If selected a today topic card -> uses exact title, text, keyword, and LinkedIn search link.
        - If user entered raw post text -> drafts directly on the user's text and builds targeted search links.
-       - If auto-discovered news topic -> provides direct LinkedIn discussion search link + news source link.
-    2. Drafts an anti-AI executive comment from Mohamed Elbaloty (CTO @ Sahalat).
+    2. Drafts an encouraging, business-first executive comment from Mohamed Elbaloty (CTO @ Sahalat).
     3. Normalizes target URN for LinkedIn API publishing.
     """
     from linkedin_api import get_recent_published_linkedin_posts
@@ -477,9 +506,6 @@ def draft_comment_for_target(
     source_name = ""
     source_url = None
     linkedin_url = ""
-    linkedin_search_url = ""
-    linkedin_search_today_url = ""
-    search_keyword = ""
     is_linkedin_post = False
     target_urn = ""
 
@@ -493,6 +519,8 @@ def draft_comment_for_target(
 
     # If user passed text into the URL field (not a URL)
     if resolved_url and not is_explicit_linkedin and not is_http_url:
+        if not resolved_title:
+            resolved_title = resolved_url
         if not resolved_text:
             resolved_text = resolved_url
         resolved_url = ""
@@ -513,43 +541,35 @@ def draft_comment_for_target(
                 resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
                 resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
         source_name = "LinkedIn Post"
-        search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        if not search_keyword:
+            search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
         urls = build_linkedin_search_urls(search_keyword)
         linkedin_search_url = urls["search_url"]
         linkedin_search_today_url = urls["today_search_url"]
-    elif resolved_url and is_http_url:
-        # User entered an external URL (e.g. external news article)
+    elif resolved_title or (resolved_url and is_http_url) or resolved_text:
         is_linkedin_post = False
-        source_url = resolved_url
-        query_text = resolved_title or "FinTech PropTech Saudi Arabia"
-        search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_keyword)
-        linkedin_url = urls["search_url"]
-        linkedin_search_url = urls["search_url"]
-        linkedin_search_today_url = urls["today_search_url"]
-        source_name = "External Tech News"
-    elif resolved_text:
-        # User provided direct post content/text
-        is_linkedin_post = False
+        source_url = resolved_url if is_http_url else None
         if not resolved_title:
-            resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "")
-        search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+            resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "") if resolved_text else "Saudi FinTech & PropTech Topic"
+        if not search_keyword:
+            search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
         urls = build_linkedin_search_urls(search_keyword)
-        linkedin_url = urls["search_url"]
-        linkedin_search_url = urls["search_url"]
-        linkedin_search_today_url = urls["today_search_url"]
-        source_name = "User Shared Post"
+        linkedin_search_url = linkedin_search_url or urls["search_url"]
+        linkedin_search_today_url = linkedin_search_today_url or urls["today_search_url"]
+        linkedin_url = linkedin_search_url
+        source_name = "Tech News & Industry"
     else:
-        # No URL or text provided: discover trending sector topic for today
+        # No URL, title, or text provided: discover trending sector topic for today
         trending = discover_trending_sector_post()
         resolved_title = trending["title"]
         resolved_text = trending["post_text"]
         source_name = trending["source"]
         source_url = trending.get("source_url")
         search_keyword = trending.get("search_keyword", "Saudi Fintech Proptech")
-        linkedin_url = trending.get("linkedin_search_url", "https://www.linkedin.com/search/results/content/")
-        linkedin_search_url = trending.get("linkedin_search_url", linkedin_url)
-        linkedin_search_today_url = trending.get("linkedin_search_today_url", linkedin_url)
+        urls = build_linkedin_search_urls(search_keyword)
+        linkedin_url = urls["search_url"]
+        linkedin_search_url = urls["search_url"]
+        linkedin_search_today_url = urls["today_search_url"]
         is_linkedin_post = False
 
     generator = CommentGenerator()
@@ -654,6 +674,9 @@ def draft_reshare_for_target(
     target_url_or_urn: str = "",
     target_text: str = "",
     target_title: str = "",
+    search_keyword: str = "",
+    linkedin_search_url: str = "",
+    linkedin_search_today_url: str = "",
 ) -> Dict[str, any]:
     """
     Orchestrates drafting a Quote Repost / Reshare with executive commentary:
@@ -677,6 +700,8 @@ def draft_reshare_for_target(
     is_http_url = resolved_url.startswith("http://") or resolved_url.startswith("https://")
 
     if resolved_url and not is_explicit_linkedin and not is_http_url:
+        if not resolved_title:
+            resolved_title = resolved_url
         if not resolved_text:
             resolved_text = resolved_url
         resolved_url = ""
@@ -695,26 +720,20 @@ def draft_reshare_for_target(
                 resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
                 resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
         source_name = "LinkedIn Post"
-        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_kw)
+        if not search_keyword:
+            search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        urls = build_linkedin_search_urls(search_keyword)
         linkedin_search_url = urls["search_url"]
-    elif resolved_url and is_http_url:
+    elif resolved_title or (resolved_url and is_http_url) or resolved_text:
         is_linkedin_post = False
-        source_url = resolved_url
+        source_url = resolved_url if is_http_url else None
         if not resolved_title:
-            resolved_title = "مقال تقني رائج في التقنية المالية والبروبتيك"
+            resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "") if resolved_text else "Saudi FinTech & PropTech Topic"
+        if not search_keyword:
+            search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
+        urls = build_linkedin_search_urls(search_keyword)
+        linkedin_search_url = linkedin_search_url or urls["search_url"]
         source_name = "Industry Source"
-        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_kw)
-        linkedin_search_url = urls["search_url"]
-    elif resolved_text:
-        is_linkedin_post = False
-        if not resolved_title:
-            resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "")
-        source_name = "User Shared Topic"
-        search_kw = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_kw)
-        linkedin_search_url = urls["search_url"]
     else:
         # Discover today's top trending topic
         trending = discover_trending_sector_post()
@@ -722,8 +741,9 @@ def draft_reshare_for_target(
         resolved_text = trending["post_text"]
         source_name = trending["source"]
         source_url = trending.get("source_url")
-        search_kw = trending.get("search_keyword", "Saudi Fintech")
-        linkedin_search_url = trending.get("linkedin_search_url", "")
+        search_keyword = trending.get("search_keyword", "Saudi Fintech")
+        urls = build_linkedin_search_urls(search_keyword)
+        linkedin_search_url = urls["search_url"]
         is_linkedin_post = False
 
     generator = CommentGenerator()
@@ -741,7 +761,7 @@ def draft_reshare_for_target(
         "target_url": source_url or "",
         "source_url": source_url,
         "source_name": source_name,
-        "search_keyword": search_kw,
+        "search_keyword": search_keyword,
         "linkedin_search_url": linkedin_search_url,
         "post_content_snippet": resolved_text[:280] + ("..." if len(resolved_text) > 280 else ""),
         "commentary": commentary,

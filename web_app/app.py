@@ -83,6 +83,10 @@ class TokenUpdateRequest(BaseModel):
 class CommentDraftRequest(BaseModel):
     target_url: Optional[str] = None
     target_text: Optional[str] = None
+    target_title: Optional[str] = None
+    search_keyword: Optional[str] = None
+    linkedin_search_url: Optional[str] = None
+    linkedin_search_today_url: Optional[str] = None
 
 
 class CommentPublishRequest(BaseModel):
@@ -98,6 +102,10 @@ class CommentToggleRequest(BaseModel):
 class ReshareDraftRequest(BaseModel):
     target_url: Optional[str] = None
     target_text: Optional[str] = None
+    target_title: Optional[str] = None
+    search_keyword: Optional[str] = None
+    linkedin_search_url: Optional[str] = None
+    linkedin_search_today_url: Optional[str] = None
 
 
 class ResharePublishRequest(BaseModel):
@@ -280,6 +288,10 @@ async def api_draft_comment(data: CommentDraftRequest):
         res = draft_comment_for_target(
             target_url_or_urn=data.target_url or "",
             target_text=data.target_text or "",
+            target_title=data.target_title or "",
+            search_keyword=data.search_keyword or "",
+            linkedin_search_url=data.linkedin_search_url or "",
+            linkedin_search_today_url=data.linkedin_search_today_url or "",
         )
         return res
     except Exception as e:
@@ -351,6 +363,10 @@ async def api_draft_reshare(data: ReshareDraftRequest):
         res = draft_reshare_for_target(
             target_url_or_urn=data.target_url or "",
             target_text=data.target_text or "",
+            target_title=data.target_title or "",
+            search_keyword=data.search_keyword or "",
+            linkedin_search_url=data.linkedin_search_url or "",
+            linkedin_search_today_url=data.linkedin_search_today_url or "",
         )
         return res
     except Exception as e:

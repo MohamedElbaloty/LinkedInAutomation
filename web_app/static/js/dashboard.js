@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTrendingTodayTopics();
     // Poll status every 12 seconds
     setInterval(pollSystemStatus, 12000);
+    // Periodically refresh trending topics every 8 minutes
+    setInterval(() => loadTrendingTodayTopics(true), 8 * 60 * 1000);
 });
 
 function initScheduleChips() {
@@ -426,6 +428,7 @@ let isDraftingComment = false;
 let isPublishingComment = false;
 let isDraftingReshare = false;
 let isPublishingReshare = false;
+let todayTopicsList = [];
 
 function switchEngagementMode(mode) {
     engagementMode = mode;
@@ -483,10 +486,23 @@ function switchEngagementMode(mode) {
 }
 
 function triggerEngagementAction() {
+    const input = document.getElementById('target-post-url-input');
+    const val = input ? input.value.trim() : '';
+    let matchedTopic = null;
+    if (val && todayTopicsList && todayTopicsList.length > 0) {
+        matchedTopic = todayTopicsList.find(t => 
+            t.clean_title === val || 
+            t.title === val || 
+            (t.source_url && t.source_url === val) ||
+            (t.clean_title && val.includes(t.clean_title)) ||
+            (t.title && val.includes(t.title))
+        );
+    }
+
     if (engagementMode === 'reshare') {
-        triggerDraftReshare();
+        triggerDraftReshare(matchedTopic);
     } else {
-        triggerDraftComment();
+        triggerDraftComment(matchedTopic);
     }
 }
 
@@ -498,7 +514,7 @@ function triggerEngagementPublish() {
     }
 }
 
-async function triggerDraftComment() {
+async function triggerDraftComment(selectedTopic = null) {
     if (isDraftingComment) return;
     isDraftingComment = true;
 
@@ -508,7 +524,27 @@ async function triggerDraftComment() {
     const reviewBox = document.getElementById('comment-review-box');
     const alertBox = document.getElementById('comment-alert-box');
 
-    const targetUrl = urlInput ? urlInput.value.trim() : '';
+    let targetUrl = urlInput ? urlInput.value.trim() : '';
+
+    if (!selectedTopic && targetUrl && todayTopicsList && todayTopicsList.length > 0) {
+        selectedTopic = todayTopicsList.find(t => 
+            t.clean_title === targetUrl || 
+            t.title === targetUrl || 
+            (t.source_url && t.source_url === targetUrl)
+        );
+    }
+
+    let payload = { target_url: targetUrl };
+    if (selectedTopic) {
+        payload = {
+            target_url: selectedTopic.source_url || targetUrl,
+            target_title: selectedTopic.title || selectedTopic.clean_title || '',
+            target_text: selectedTopic.clean_title || selectedTopic.title || '',
+            search_keyword: selectedTopic.search_keyword || '',
+            linkedin_search_url: selectedTopic.linkedin_search_url || '',
+            linkedin_search_today_url: selectedTopic.linkedin_search_today_url || ''
+        };
+    }
 
     draftBtn.disabled = true;
     alertBox.style.display = 'none';
@@ -519,7 +555,7 @@ async function triggerDraftComment() {
         const response = await fetch('/api/comment/draft', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target_url: targetUrl })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
@@ -682,7 +718,7 @@ async function triggerPublishComment() {
     }
 }
 
-async function triggerDraftReshare() {
+async function triggerDraftReshare(selectedTopic = null) {
     if (isDraftingReshare) return;
     isDraftingReshare = true;
 
@@ -693,7 +729,27 @@ async function triggerDraftReshare() {
     const reviewBox = document.getElementById('comment-review-box');
     const alertBox = document.getElementById('comment-alert-box');
 
-    const targetUrl = urlInput ? urlInput.value.trim() : '';
+    let targetUrl = urlInput ? urlInput.value.trim() : '';
+
+    if (!selectedTopic && targetUrl && todayTopicsList && todayTopicsList.length > 0) {
+        selectedTopic = todayTopicsList.find(t => 
+            t.clean_title === targetUrl || 
+            t.title === targetUrl || 
+            (t.source_url && t.source_url === targetUrl)
+        );
+    }
+
+    let payload = { target_url: targetUrl };
+    if (selectedTopic) {
+        payload = {
+            target_url: selectedTopic.source_url || targetUrl,
+            target_title: selectedTopic.clean_title || selectedTopic.title || '',
+            target_text: selectedTopic.clean_title || selectedTopic.title || '',
+            search_keyword: selectedTopic.search_keyword || '',
+            linkedin_search_url: selectedTopic.linkedin_search_url || '',
+            linkedin_search_today_url: selectedTopic.linkedin_search_today_url || ''
+        };
+    }
 
     draftBtn.disabled = true;
     alertBox.style.display = 'none';
@@ -707,7 +763,7 @@ async function triggerDraftReshare() {
         const response = await fetch('/api/reshare/draft', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target_url: targetUrl })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
@@ -916,19 +972,26 @@ async function toggleAutoComment(checkbox) {
 }
 
 // ---------------------------------------------------------------------------
-// Today's Hot Topics Loader
+// Today's Hot Topics Loader & Interactive Switcher
 // ---------------------------------------------------------------------------
-async function loadTrendingTodayTopics() {
+async function loadTrendingTodayTopics(force = false) {
+    const refreshBtn = document.getElementById('btn-refresh-today');
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+
     try {
-        const res = await fetch('/api/comment/trending-today');
+        const url = force ? `/api/comment/trending-today?t=${Date.now()}` : '/api/comment/trending-today';
+        const res = await fetch(url);
         const data = await res.json();
         const container = document.getElementById('trending-today-section');
         const grid = document.getElementById('trending-today-grid');
+
+        if (refreshBtn) refreshBtn.classList.remove('spinning');
         if (!container || !grid) return;
 
         if (data.success && data.topics && data.topics.length > 0) {
+            todayTopicsList = data.topics;
             grid.innerHTML = '';
-            data.topics.forEach(topic => {
+            data.topics.forEach((topic, idx) => {
                 const card = document.createElement('div');
                 card.className = 'today-topic-card';
                 card.innerHTML = `
@@ -938,13 +1001,13 @@ async function loadTrendingTodayTopics() {
                     </div>
                     <div class="today-topic-title" title="${escapeHtml(topic.title)}">${escapeHtml(topic.clean_title || topic.title)}</div>
                     <div class="today-topic-actions">
-                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, ${JSON.stringify(topic.source_url || '').replace(/"/g, '&quot;')}, 'comment')" title="توليد تعليق CTO مباشر">
+                        <button type="button" class="btn-topic-action btn-topic-primary" onclick="selectTodayTopicIndex(${idx}, 'comment')" title="توليد تعليق CTO مباشر لهذا الخبر">
                             💬 تعليق CTO
                         </button>
-                        <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopic(${JSON.stringify(topic.title).replace(/"/g, '&quot;')}, ${JSON.stringify(topic.source_url || '').replace(/"/g, '&quot;')}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
+                        <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopicIndex(${idx}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
                             🚀 مشاركة وتحليل
                         </button>
-                        <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض النقاشات على LinkedIn">
+                        <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض منشورات النقاش حول هذا الخبر بالذات على LinkedIn">
                             🔍 LinkedIn ↗️
                         </a>
                     </div>
@@ -955,10 +1018,38 @@ async function loadTrendingTodayTopics() {
         }
     } catch (e) {
         console.warn('Failed to load today trending topics:', e);
+        if (refreshBtn) refreshBtn.classList.remove('spinning');
+    }
+}
+
+function refreshTodayTrendingTopics() {
+    loadTrendingTodayTopics(true);
+}
+
+function selectTodayTopicIndex(idx, mode = 'comment') {
+    const topic = todayTopicsList[idx];
+    if (!topic) return;
+
+    switchEngagementMode(mode);
+    const input = document.getElementById('target-post-url-input');
+    if (input) {
+        input.value = topic.clean_title || topic.title;
+    }
+
+    if (mode === 'reshare') {
+        triggerDraftReshare(topic);
+    } else {
+        triggerDraftComment(topic);
     }
 }
 
 function selectTodayTopic(title, sourceUrl = '', mode = 'comment') {
+    const matched = todayTopicsList.find(t => (t.title === title || t.clean_title === title || (sourceUrl && t.source_url === sourceUrl)));
+    if (matched) {
+        const idx = todayTopicsList.indexOf(matched);
+        selectTodayTopicIndex(idx, mode);
+        return;
+    }
     switchEngagementMode(mode);
     const input = document.getElementById('target-post-url-input');
     if (input) {

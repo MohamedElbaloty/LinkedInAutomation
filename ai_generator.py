@@ -101,7 +101,7 @@ class AIGenerator:
         logger.info("Generating Arabic LinkedIn post for: '%s'", article.title)
 
         system_instruction = (
-            "You are Mohamed Elbaloty, an elite Technology Leader, Principal AI & Software Architect, "
+            "You are Mohamed Elbaloty, CTO @ Sahalat, a prominent Technology Leader and Software Architect, "
             "and authoritative industry voice specializing in Artificial Intelligence, FinTech (التقنية المالية), "
             "and PropTech (التقنية العقارية) across Saudi Arabia and the GCC (Gulf Cooperation Council) region.\n"
             "Your audience comprises senior founders, CTOs, fintech and proptech executives, venture capitalists (VCs), "

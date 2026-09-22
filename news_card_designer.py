@@ -264,10 +264,10 @@ def render_editorial_news_card(
             logger.debug("Could not paste avatar: %s", e)
 
     # Author Name & Verified Badge
-    auth_name = shape_arabic("Mohamed Elbaloty | محمد البلوطي")
+    auth_name = "Mohamed Elbaloty"
     draw.text((135, height - 85), auth_name, font=name_font, fill=(255, 255, 255))
     
-    auth_title = shape_arabic("Principal AI & Technology Architect • Tech Executive")
+    auth_title = "CTO @ Sahalat"
     draw.text((135, height - 58), auth_title, font=role_font, fill=(148, 163, 184))
 
     # Source Attribution (Right bottom)

@@ -92,6 +92,99 @@
             <div class="result-alert-box" id="result-alert-box" style="display: none;"></div>
         </section>
 
+        <!-- LinkedIn Organic Engagement & Authentic Commenting Section -->
+        <section class="comment-engine-card glass-card" id="comment-engine-section">
+            <div class="comment-engine-header">
+                <div class="card-title-group">
+                    <span class="card-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">💬</span>
+                    <div>
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            محرك التعليق والتفاعل الذكي على LinkedIn (Profile Visibility Booster)
+                            <span class="tag-pill" style="font-size: 11px; padding: 2px 8px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                🛡️ أسلوب تنفيذي أصيل • Zero AI Cliches
+                            </span>
+                        </h3>
+                        <p class="card-desc" style="margin-top: 4px; margin-bottom: 0;">
+                            يعلق باسمك <strong>Mohamed Elbaloty (CTO @ Sahalat)</strong> على منشورات رواد الأعمال والشركات في التقنية المالية (FinTech)، التقنية العقارية (PropTech)، والذكاء الاصطناعي في السعودية والخليج لرفع نسبة مشاهدات وتفاعل حسابك.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Autonomous Status & Toggle -->
+                <div class="comment-auto-toggle-box">
+                    <span class="auto-status-indicator {{ 'active' if comment_settings.auto_comment_enabled else '' }}" id="auto-comment-status-text">
+                        {{ 'التعليق الآلي: نشط 🟢' if comment_settings.auto_comment_enabled else 'التعليق الآلي: بانتظار تأكيدك ⚪' }}
+                    </span>
+                    <label class="toggle-switch" title="تفعيل أو إيقاف التعليق التلقائي المجدول">
+                        <input type="checkbox" id="auto-comment-toggle" {{ 'checked' if comment_settings.auto_comment_enabled else '' }} onchange="toggleAutoComment(this)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Input / Action Row -->
+            <div class="comment-action-row">
+                <div class="comment-input-wrapper">
+                    <span class="input-icon">🔗</span>
+                    <input type="text" id="target-post-url-input" class="input-text" placeholder="ضع رابط أي منشور على لينكد إن (URL) تريد التعليق عليه، أو اتركه فارغاً للاكتشاف الذكي بالقطاع..." dir="ltr">
+                </div>
+                <div class="comment-btn-group">
+                    <button class="btn btn-primary btn-glow" id="btn-draft-comment" onclick="triggerDraftComment()">
+                        <span class="btn-icon">⚡</span>
+                        <span class="btn-text">اختبار تعليق على خبر / منشور</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Comment Progress / Loading Spinner -->
+            <div class="comment-loading-box" id="comment-loading-box" style="display: none;">
+                <div class="spinner"></div>
+                <span class="loading-text" id="comment-loading-text">جاري فحص المنشور وتوليد تعليق تنفيذي برؤية CTO أصيلة وخالية من الذكاء الاصطناعي...</span>
+            </div>
+
+            <!-- Interactive Comment Review Box (Shown when drafted) -->
+            <div class="comment-review-box" id="comment-review-box" style="display: none;">
+                <div class="review-header">
+                    <div class="post-preview-info">
+                        <span class="target-tag">📌 المنشور المستهدف:</span>
+                        <h4 class="target-title" id="review-target-title">عنوان المنشور</h4>
+                        <div class="target-meta">
+                            <span class="target-urn-badge" id="review-target-urn">urn:li:activity:...</span>
+                            <a href="#" target="_blank" class="link-external" id="review-target-url-link">
+                                🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="review-body">
+                    <div class="comment-field-header">
+                        <span class="comment-label">
+                            ✍️ نص التعليق المقترح (يمكنك التعديل عليه مباشرة قبل النشر):
+                        </span>
+                        <div class="comment-badges">
+                            <span class="badge-pill">👤 الحساب: Mohamed Elbaloty (CTO @ Sahalat)</span>
+                            <span class="badge-pill pill-green">🛡️ 100% Anti-AI Persona</span>
+                        </div>
+                    </div>
+                    <textarea id="review-comment-textarea" class="comment-textarea" rows="4" dir="rtl"></textarea>
+                </div>
+
+                <div class="review-actions">
+                    <button class="btn btn-publish-comment btn-glow" id="btn-publish-comment" onclick="triggerPublishComment()">
+                        <span class="btn-icon">💬</span>
+                        <span class="btn-text">علق الآن على LinkedIn</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="triggerDraftComment()">
+                        <span>🔄 توليد صياغة أخرى</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Comment Success / Error Alert Box -->
+            <div class="comment-alert-box" id="comment-alert-box" style="display: none;"></div>
+        </section>
+
         <!-- Main Dashboard Grid -->
         <div class="dashboard-grid">
             <!-- Left Column: Scheduling & Strategy -->

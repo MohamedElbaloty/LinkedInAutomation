@@ -222,6 +222,25 @@ class GrowthSchedulerService:
             except Exception as e:
                 logger.error("Failed to register job for time '%s': %s", t, e)
 
+        # Check and register autonomous commenting schedule
+        try:
+            from comment_engine import load_comment_settings
+            c_settings = load_comment_settings()
+            if c_settings.get("auto_comment_enabled", False):
+                self.scheduler.add_job(
+                    self.execute_comment_job,
+                    trigger=CronTrigger(hour="9,12,15,19", minute=30, timezone=TIMEZONE_STR),
+                    id="auto_comment_job",
+                    replace_existing=True,
+                    name=f"LinkedIn Organic Commenting ({TIMEZONE_STR})",
+                )
+                logger.info("Registered autonomous commenting job at 09:30, 12:30, 15:30, 19:30 (%s)", TIMEZONE_STR)
+            else:
+                if self.scheduler.get_job("auto_comment_job"):
+                    self.scheduler.remove_job("auto_comment_job")
+        except Exception as c_err:
+            logger.debug("Comment job registration skipped: %s", c_err)
+
     def update_times(self, new_times: List[str], enabled: bool = True) -> Dict[str, any]:
         """Updates schedule times and rebuilds cron jobs."""
         cleaned_times = []
@@ -435,6 +454,40 @@ class GrowthSchedulerService:
             self.is_running_job = False
 
         return result
+
+    async def execute_comment_job(self) -> Dict[str, any]:
+        """Autonomous organic commenting cycle on trending sector discussions."""
+        try:
+            from comment_engine import load_comment_settings, draft_comment_for_target, execute_linkedin_comment
+            c_settings = load_comment_settings()
+            if not c_settings.get("auto_comment_enabled", False):
+                return {"success": False, "reason": "Auto commenting is disabled"}
+
+            if c_settings.get("comments_today", 0) >= c_settings.get("max_daily_comments", 4):
+                logger.info("Daily comment limit reached. Skipping autonomous comment cycle.")
+                return {"success": False, "reason": "Daily comment limit reached"}
+
+            loop = asyncio.get_running_loop()
+            draft = await loop.run_in_executor(None, draft_comment_for_target)
+            target_urn = draft.get("post_urn")
+
+            if not target_urn or not target_urn.startswith("urn:li:"):
+                logger.info("Auto-comment target does not have a live LinkedIn URN (%s). Saved for manual test.", draft.get("post_title"))
+                return {"success": True, "draft": draft, "published": False}
+
+            def _comment():
+                return execute_linkedin_comment(
+                    target_urn_or_url=target_urn,
+                    comment_text=draft["comment_text"],
+                    post_title=draft["post_title"],
+                )
+
+            res = await loop.run_in_executor(None, _comment)
+            logger.info("Autonomous LinkedIn comment cycle executed: %s", res)
+            return res
+        except Exception as e:
+            logger.error("Error executing autonomous comment cycle: %s", e)
+            return {"success": False, "error": str(e)}
 
 
 # Global scheduler service instance

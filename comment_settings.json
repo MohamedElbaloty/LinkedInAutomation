@@ -1,0 +1,14 @@
+{
+  "auto_comment_enabled": false,
+  "max_daily_comments": 4,
+  "comments_today": 0,
+  "last_comment_date": "2026-09-22",
+  "last_comment_time": null,
+  "target_sectors": [
+    "FinTech",
+    "PropTech",
+    "AI Infrastructure",
+    "SAMA Regulations"
+  ],
+  "history": []
+}

@@ -75,7 +75,7 @@ class GenerationResult(BaseModel):
     )
     layout_archetype: Optional[str] = Field(
         default="auto",
-        description="Visual layout structure: 'split_left' (metric left), 'split_right' (metric right), or 'hero_top' (full-width banner)."
+        description="Visual layout structure: 'executive_broadsheet' (luxury ivory FT/WSJ newspaper), 'bold_statement_hero' (Apple minimalist typography), 'cyber_radar_cockpit' (DeepTech telemetry HUD), 'magazine_asymmetric_cover' (Wired/Fast Company color block), 'split_left' (classic metric left), 'split_right' (classic metric right), or 'hero_top' (glass banner)."
     )
     image_prompt: Optional[str] = Field(
         default="",
@@ -127,7 +127,7 @@ class AIGenerator:
             "10. 'bullet_points': 2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card.\n"
             "11. 'sector_tags': 3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce'].\n"
             "12. 'theme_name': Choose dynamically from ['fintech_emerald', 'saudi_gold', 'ai_cyan', 'proptech_amber', 'deeptech_purple', 'bloomberg_orange', 'crimson_pulse', 'midnight_sapphire']. Select the most appropriate color theme for the sector.\n"
-            "13. 'layout_archetype': Choose dynamically from ['split_left', 'split_right', 'hero_top'] to give each news card a unique layout.\n\n"
+            "13. 'layout_archetype': Choose dynamically from ['executive_broadsheet', 'bold_statement_hero', 'cyber_radar_cockpit', 'magazine_asymmetric_cover', 'split_left', 'split_right', 'hero_top'] to give each news card a radically unique visual identity.\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
             "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
             "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"

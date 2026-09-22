@@ -414,3 +414,161 @@ async function refreshHistory() {
         console.warn('History refresh failed:', e);
     }
 }
+
+/* ==========================================================================
+   LinkedIn Organic Commenting Engine Client Controller
+   ========================================================================== */
+let currentDraftPost = null;
+let isDraftingComment = false;
+let isPublishingComment = false;
+
+async function triggerDraftComment() {
+    if (isDraftingComment) return;
+    isDraftingComment = true;
+
+    const urlInput = document.getElementById('target-post-url-input');
+    const draftBtn = document.getElementById('btn-draft-comment');
+    const loadingBox = document.getElementById('comment-loading-box');
+    const reviewBox = document.getElementById('comment-review-box');
+    const alertBox = document.getElementById('comment-alert-box');
+
+    const targetUrl = urlInput ? urlInput.value.trim() : '';
+
+    draftBtn.disabled = true;
+    alertBox.style.display = 'none';
+    reviewBox.style.display = 'none';
+    loadingBox.style.display = 'flex';
+
+    try {
+        const response = await fetch('/api/comment/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_url: targetUrl })
+        });
+
+        const data = await response.json();
+        loadingBox.style.display = 'none';
+        draftBtn.disabled = false;
+        isDraftingComment = false;
+
+        if (data.success) {
+            currentDraftPost = data;
+
+            document.getElementById('review-target-title').textContent = data.post_title || 'منشور قطاعي متخصص';
+            document.getElementById('review-target-urn').textContent = data.post_urn || 'LinkedIn Feed Post';
+            
+            const linkElem = document.getElementById('review-target-url-link');
+            if (linkElem) {
+                linkElem.href = data.post_url || '#';
+                linkElem.style.display = data.post_url ? 'inline-flex' : 'none';
+            }
+
+            const textarea = document.getElementById('review-comment-textarea');
+            if (textarea) {
+                textarea.value = data.comment_text || '';
+            }
+
+            reviewBox.style.display = 'block';
+            reviewBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alertBox.className = 'comment-alert-box error';
+            alertBox.innerHTML = `<strong>⚠️ تنبيه:</strong> ${data.error || 'تعذر استكشاف المنشور أو توليد التعليق.'}`;
+            alertBox.style.display = 'block';
+        }
+    } catch (err) {
+        loadingBox.style.display = 'none';
+        draftBtn.disabled = false;
+        isDraftingComment = false;
+        alertBox.className = 'comment-alert-box error';
+        alertBox.innerHTML = `<strong>❌ خطأ في الاتصال:</strong> ${err.message}`;
+        alertBox.style.display = 'block';
+    }
+}
+
+async function triggerPublishComment() {
+    if (isPublishingComment || !currentDraftPost) return;
+    isPublishingComment = true;
+
+    const publishBtn = document.getElementById('btn-publish-comment');
+    const textarea = document.getElementById('review-comment-textarea');
+    const alertBox = document.getElementById('comment-alert-box');
+
+    const commentText = textarea ? textarea.value.trim() : '';
+    if (!commentText) {
+        alert('الرجاء التأكد من وجود نص للتعليق قبل النشر.');
+        isPublishingComment = false;
+        return;
+    }
+
+    publishBtn.disabled = true;
+    publishBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> جاري النشر على LinkedIn...';
+    alertBox.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/comment/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                target_urn: currentDraftPost.post_urn || currentDraftPost.post_url,
+                comment_text: commentText,
+                post_title: currentDraftPost.post_title
+            })
+        });
+
+        const result = await response.json();
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = '<span class="btn-icon">💬</span><span class="btn-text">علق الآن على LinkedIn</span>';
+        isPublishingComment = false;
+
+        if (result.success) {
+            const viewUrl = result.public_url || (currentDraftPost.post_url ? currentDraftPost.post_url : 'https://www.linkedin.com/feed/');
+            alertBox.className = 'comment-alert-box success';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 6px;">🎉 تم نشر تعليقك بنجاح وبشكل فوري على LinkedIn!</div>
+                <div style="font-size: 13px; margin-bottom: 12px;">👤 المنشور المستهدف: <strong>${currentDraftPost.post_title}</strong></div>
+                <a href="${viewUrl}" target="_blank" class="btn btn-secondary" style="padding: 8px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                    🔗 اضغط هنا لفتح المنشور على LinkedIn ومشاهدة تعليقك منشوراً الآن ↗️
+                </a>
+            `;
+            alertBox.style.display = 'block';
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alertBox.className = 'comment-alert-box error';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 4px;">⚠️ تنبيه أثناء نشر التعليق:</div>
+                <div style="font-size: 13px;">${result.error || 'تعذر إرسال التعليق إلى واجهة LinkedIn الرسمية. تأكد من ربط حسابك بـ Access Token.'}</div>
+            `;
+            alertBox.style.display = 'block';
+        }
+    } catch (err) {
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = '<span class="btn-icon">💬</span><span class="btn-text">علق الآن على LinkedIn</span>';
+        isPublishingComment = false;
+        alertBox.className = 'comment-alert-box error';
+        alertBox.innerHTML = `<strong>❌ خطأ غير متوقع:</strong> ${err.message}`;
+        alertBox.style.display = 'block';
+    }
+}
+
+async function toggleAutoComment(checkbox) {
+    const isEnabled = checkbox.checked;
+    const statusText = document.getElementById('auto-comment-status-text');
+
+    if (statusText) {
+        statusText.textContent = isEnabled ? 'التعليق الآلي: نشط 🟢' : 'التعليق الآلي: بانتظار تأكيدك ⚪';
+        statusText.className = isEnabled ? 'auto-status-indicator active' : 'auto-status-indicator';
+    }
+
+    try {
+        const resp = await fetch('/api/comment/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: isEnabled })
+        });
+        const data = await resp.json();
+        console.log('Autonomous comment toggle result:', data);
+    } catch (e) {
+        console.error('Failed to toggle commenting mode:', e);
+        checkbox.checked = !isEnabled;
+    }
+}

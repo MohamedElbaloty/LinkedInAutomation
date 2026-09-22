@@ -17,6 +17,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from comment_engine import (
+    draft_comment_for_target,
+    execute_linkedin_comment,
+    load_comment_settings,
+    save_comment_settings,
+)
 from config import (
     BASE_DIR,
     DB_PATH,
@@ -71,6 +77,21 @@ class TokenUpdateRequest(BaseModel):
     person_urn: Optional[str] = None
 
 
+class CommentDraftRequest(BaseModel):
+    target_url: Optional[str] = None
+    target_text: Optional[str] = None
+
+
+class CommentPublishRequest(BaseModel):
+    target_urn: str
+    comment_text: str
+    post_title: Optional[str] = None
+
+
+class CommentToggleRequest(BaseModel):
+    enabled: bool
+
+
 def get_posted_history(limit: int = 15) -> List[Dict[str, str]]:
     """Fetches recently posted articles from SQLite."""
     if not DB_PATH.exists():
@@ -98,11 +119,14 @@ async def home(request: Request):
     is_telegram_connected = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
     is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT"))
 
+    comment_settings = load_comment_settings()
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
             "settings": settings,
+            "comment_settings": comment_settings,
             "history": history,
             "unread": unread,
             "is_linkedin_connected": is_linkedin_connected,
@@ -226,3 +250,54 @@ async def save_linkedin_token(data: TokenUpdateRequest):
         return {"success": True, "message": "LinkedIn token verified successfully!", "person_urn": urn}
     except Exception as e:
         return {"success": False, "error": f"Token validation failed: {str(e)}"}
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn Organic Engagement & Commenting Engine APIs
+# ---------------------------------------------------------------------------
+
+@app.post("/api/comment/draft")
+async def api_draft_comment(data: CommentDraftRequest):
+    """
+    Analyzes target post or discovers a trending sector post,
+    then drafts an authentic CTO comment (Mohamed Elbaloty, CTO @ Sahalat).
+    """
+    try:
+        res = draft_comment_for_target(
+            target_url_or_urn=data.target_url or "",
+            target_text=data.target_text or "",
+        )
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/api/comment/publish")
+async def api_publish_comment(data: CommentPublishRequest):
+    """
+    Publishes an authentic comment live on LinkedIn via official REST API.
+    """
+    try:
+        res = execute_linkedin_comment(
+            target_urn_or_url=data.target_urn,
+            comment_text=data.comment_text,
+            post_title=data.post_title or "",
+        )
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.get("/api/comment/settings")
+async def api_get_comment_settings():
+    """Returns current automated commenting settings and recent history."""
+    return load_comment_settings()
+
+
+@app.post("/api/comment/toggle")
+async def api_toggle_commenting(data: CommentToggleRequest):
+    """Enables or disables autonomous background commenting."""
+    settings = load_comment_settings()
+    settings["auto_comment_enabled"] = data.enabled
+    save_comment_settings(settings)
+    return {"success": True, "settings": settings}

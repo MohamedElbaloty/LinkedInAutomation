@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 from typing import Dict, List, Optional, Tuple
+import urllib.parse
 import requests
 
 from config import (
@@ -80,8 +81,42 @@ def escape_linkedin_commentary(text: str) -> str:
     if not text:
         return ""
     # Normalize existing escapes to avoid double-escaping
-    cleaned = re.sub(r"\\([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))", r"\1", text)
     return LINKEDIN_LITTLE_TEXT_ESCAPE_RE.sub(r"\\\1", cleaned)
+
+
+def extract_urn_from_linkedin_url(url_or_urn: str) -> str:
+    """
+    Extracts or normalizes a LinkedIn post/activity URN from a URL or raw URN string.
+    Examples handled:
+    - https://www.linkedin.com/feed/update/urn:li:activity:7123456789012345678/ -> urn:li:activity:7123456789012345678
+    - https://www.linkedin.com/feed/update/urn:li:share:7123456789012345678/ -> urn:li:share:7123456789012345678
+    - https://www.linkedin.com/posts/username_slug-activity-7123456789012345678-abcd/ -> urn:li:activity:7123456789012345678
+    - urn:li:activity:7123456789012345678 -> urn:li:activity:7123456789012345678
+    - 7123456789012345678 -> urn:li:activity:7123456789012345678
+    """
+    cleaned = (url_or_urn or "").strip()
+    if not cleaned:
+        return ""
+
+    urn_match = re.search(r"(urn:li:(?:activity|share|ugcPost):\d+)", cleaned)
+    if urn_match:
+        return urn_match.group(1)
+
+    act_match = re.search(r"activity[-:]([0-9]{15,25})", cleaned)
+    if act_match:
+        return f"urn:li:activity:{act_match.group(1)}"
+
+    feed_match = re.search(r"/update/([0-9]{15,25})", cleaned)
+    if feed_match:
+        return f"urn:li:activity:{feed_match.group(1)}"
+
+    if cleaned.isdigit() and len(cleaned) >= 15:
+        return f"urn:li:activity:{cleaned}"
+
+    if cleaned.startswith("urn:li:"):
+        return cleaned.split("?")[0].rstrip("/")
+
+    return cleaned
 
 
 class LinkedInAPIClient:
@@ -399,6 +434,45 @@ class LinkedInAPIClient:
             "method": "official_api",
         }
 
+    def create_comment(self, target_urn_or_url: str, comment_text: str) -> Dict[str, any]:
+        """
+        Publishes a top-level executive comment on a target LinkedIn post using the official Social Actions REST API.
+        Safe for Cloud/Railway hosting.
+        """
+        target_urn = extract_urn_from_linkedin_url(target_urn_or_url)
+        if not target_urn:
+            raise ValueError(f"Could not extract a valid LinkedIn post URN from: {target_urn_or_url}")
+
+        if not self.person_urn:
+            self.fetch_my_profile_urn()
+
+        escaped_comment = escape_linkedin_commentary(comment_text)
+        encoded_urn = urllib.parse.quote(target_urn, safe="")
+        url = f"{LINKEDIN_API_BASE}/rest/socialActions/{encoded_urn}/comments"
+
+        payload = {
+            "actor": self.person_urn,
+            "message": {
+                "text": escaped_comment
+            }
+        }
+
+        resp = self._request_with_version_retry("POST", url, json=payload, timeout=25)
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(f"Failed to post comment on LinkedIn: {resp.status_code} - {resp.text}")
+
+        comment_urn = resp.headers.get("x-restli-id") or resp.headers.get("x-linkedin-id") or ""
+        public_url = f"https://www.linkedin.com/feed/update/{target_urn}"
+        logger.info("Comment successfully posted on LinkedIn post %s (Comment URN: %s)", target_urn, comment_urn)
+
+        return {
+            "success": True,
+            "target_urn": target_urn,
+            "comment_urn": comment_urn,
+            "public_url": public_url,
+            "method": "official_api",
+        }
+
 
 def publish_article_to_linkedin_safe(
     post_text: str,
@@ -464,3 +538,31 @@ def publish_article_to_linkedin_safe(
         ),
         "method": "none",
     }
+
+
+def publish_comment_to_linkedin(
+    target_urn_or_url: str,
+    comment_text: str,
+) -> Dict[str, any]:
+    """
+    Unified entry point for publishing comments to LinkedIn.
+    Uses Official REST API (Safe for Railway/Cloud).
+    """
+    token = os.getenv("LINKEDIN_ACCESS_TOKEN", "").strip() or LINKEDIN_ACCESS_TOKEN
+    if not token:
+        return {
+            "success": False,
+            "error": "LinkedIn credentials not configured. Please save your Access Token in the dashboard.",
+            "method": "none",
+        }
+
+    try:
+        client = LinkedInAPIClient(access_token=token)
+        return client.create_comment(target_urn_or_url=target_urn_or_url, comment_text=comment_text)
+    except Exception as e:
+        logger.error("Failed to publish comment to LinkedIn: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "method": "official_api",
+        }

@@ -173,6 +173,61 @@ def _fit_metric_font(draw: ImageDraw.Draw, text: str, max_w: int, base_size: int
     return font
 
 
+def create_blended_canvas(
+    width: int,
+    height: int,
+    theme: dict,
+    background_image_path: Optional[Path] = None,
+    dim_factor: float = 0.36,
+) -> Image.Image:
+    """
+    Creates a luxurious blended mesh gradient canvas with multi-stop harmonic color bleeds.
+    If background_image_path is provided, smoothly composites it behind a luxury dark wash.
+    """
+    primary = theme.get("primary", (6, 182, 212))
+    primary_light = theme.get("primary_light", (103, 232, 249))
+    accent = theme.get("accent", (168, 85, 247))
+
+    if background_image_path and Path(background_image_path).exists():
+        try:
+            bg_raw = Image.open(background_image_path).convert("RGB")
+            bg_resized = bg_raw.resize((width, height), Image.Resampling.LANCZOS)
+            # Luxury dark tint overlay so text has 100% executive contrast
+            tint = Image.new("RGBA", (width, height), (10, 15, 26, int(255 * (1 - dim_factor))))
+            bg_rgba = bg_resized.convert("RGBA")
+            blended = Image.alpha_composite(bg_rgba, tint).convert("RGB")
+            return blended
+        except Exception as e:
+            logger.debug("Failed to composite background visual: %s", e)
+
+    # Multi-stop subtle diagonal base gradient
+    base = Image.new("RGB", (width, height))
+    draw_base = ImageDraw.Draw(base)
+    for y in range(height):
+        t = y / height
+        r = int(10 * (1 - t) + 15 * t)
+        g = int(14 * (1 - t) + 23 * t)
+        b = int(26 * (1 - t) + 40 * t)
+        draw_base.line([(0, y), (width, y)], fill=(r, g, b))
+
+    # Ambient light glow layer with Gaussian blur (Mesh Gradient)
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+
+    # 3 Harmonious ambient glowing orbs blending seamlessly
+    # Top-Right: Primary color glow
+    glow_draw.ellipse([width - 480, -160, width + 260, 460], fill=(primary[0], primary[1], primary[2], 75))
+    # Bottom-Left: Accent color glow
+    glow_draw.ellipse([-180, height - 380, 440, height + 220], fill=(accent[0], accent[1], accent[2], 65))
+    # Top-Center: Primary light soft highlight
+    glow_draw.ellipse([width // 3 - 220, -220, width // 3 + 420, 260], fill=(primary_light[0], primary_light[1], primary_light[2], 40))
+
+    glow = glow.filter(ImageFilter.GaussianBlur(110))
+    base = base.convert("RGBA")
+    return Image.alpha_composite(base, glow).convert("RGB")
+
+
+
 # ---------------------------------------------------------------------------
 # PARADIGM 1: Financial Times / WSJ Light Ivory Luxury Broadsheet Newspaper
 # ---------------------------------------------------------------------------
@@ -316,29 +371,36 @@ def _render_bold_statement_hero(
     bullet_points: List[str],
     sector_tags: List[str],
     source_name: str,
-    primary: tuple,
-    primary_light: tuple,
+    theme: dict,
     target_path: Path,
+    background_image_path: Optional[Path] = None,
 ) -> Path:
-    # 1. Deep Matte Obsidian Canvas
-    img = Image.new("RGB", (width, height), (13, 17, 23))
+    primary = theme.get("primary", (6, 182, 212))
+    primary_light = theme.get("primary_light", (103, 232, 249))
+    accent = theme.get("accent", (168, 85, 247))
+
+    # 1. Luxurious Blended Mesh Canvas
+    img = create_blended_canvas(width, height, theme, background_image_path=background_image_path, dim_factor=0.36)
     draw = ImageDraw.Draw(img)
 
-    # 2. Large Watermark Quote symbol in background
-    bg_quote_font = _get_font(260)
-    draw.text((60, 60), "“", font=bg_quote_font, fill=(22, 30, 42))
+    # 2. Glowing top accent border line
+    for x in range(width):
+        ratio = x / width
+        r = int(primary[0] * (1 - ratio) + accent[0] * ratio)
+        g = int(primary[1] * (1 - ratio) + accent[1] * ratio)
+        b = int(primary[2] * (1 - ratio) + accent[2] * ratio)
+        draw.line([(x, 0), (x, 3)], fill=(r, g, b))
 
     # Fonts
     badge_font = _get_font(18)
     hero_title_font = _get_font(42)
-    metric_font = _get_font(52)
     sub_font = _get_font(22)
     role_font = _get_font(16)
     name_font = _get_font(22)
 
-    # 3. Top Category Capsule
+    # 3. Top Category Capsule (Floating frosted pill)
     top_badge = shape_arabic(f"{category_badge or 'التقنية والريادة'}  •  {event_badge or 'تحديث استراتيجي'}")
-    draw.rounded_rectangle([70, 45, 70 + 440, 85], radius=20, fill=(22, 28, 40), outline=primary, width=1)
+    draw.rounded_rectangle([70, 45, 70 + 460, 85], radius=20, fill=(16, 24, 40), outline=(255, 255, 255, 35), width=1)
     draw.ellipse([85, 60, 95, 70], fill=primary_light)
     draw.text((105, 52), top_badge, font=badge_font, fill=primary_light)
 
@@ -351,33 +413,50 @@ def _render_bold_statement_hero(
         curr_y += 62
 
     # Glowing thin horizontal underline
-    draw.line([(70, curr_y + 15), (width - 70, curr_y + 15)], fill=(38, 48, 68), width=1)
+    draw.line([(70, curr_y + 15), (width - 70, curr_y + 15)], fill=(45, 60, 85), width=1)
 
-    # 5. Middle Split: Hero Metric + 2 Clean Bullet Points
-    # Left: Big Metric
+    # 5. Middle Split: Frosted Hero Metric Card + 2 Clean Bullet Points
     stat_x = 70
     stat_y = curr_y + 35
-    draw.text((stat_x, stat_y), shape_arabic(metric_label or "المؤشر القياسي"), font=role_font, fill=(148, 163, 184))
+    stat_w = 380
+    stat_h = 240
+
+    # Frosted stat box
+    draw.rounded_rectangle([stat_x, stat_y, stat_x + stat_w, stat_y + stat_h], radius=16, fill=(14, 22, 38), outline=primary, width=2)
+    draw.rounded_rectangle([stat_x + 20, stat_y + 14, stat_x + 60, stat_y + 18], radius=2, fill=primary_light)
+    draw.text((stat_x + 22, stat_y + 30), shape_arabic(metric_label or "المؤشر القياسي"), font=role_font, fill=(148, 163, 184))
 
     display_metric = metric_value.strip() if metric_value else "LEADERSHIP"
-    m_font = _fit_metric_font(draw, display_metric, 360, base_size=54)
-    draw.text((stat_x, stat_y + 35), display_metric, font=m_font, fill=primary_light)
+    m_font = _fit_metric_font(draw, display_metric, stat_w - 44, base_size=54)
+    draw.text((stat_x + 22, stat_y + 75), display_metric, font=m_font, fill=(255, 255, 255))
 
-    draw.text((stat_x, stat_y + 115), shape_arabic(metric_sub or "السوق السعودي والخليجي"), font=sub_font, fill=(226, 232, 240))
+    draw.text((stat_x + 22, stat_y + 165), shape_arabic(metric_sub or "السوق السعودي والخليجي"), font=sub_font, fill=primary_light)
+    draw.line([(stat_x + 22, stat_y + 205), (stat_x + stat_w - 22, stat_y + 205)], fill=(35, 50, 75), width=1)
 
     # Right: 2 Key Takeaways (Swiss Minimalist)
-    right_x = 520
+    right_x = stat_x + stat_w + 45
     right_w = width - right_x - 70
-    bp_y = stat_y + 10
+    bp_y = stat_y + 20
     for bp in bullet_points[:2]:
         cleaned_bp = bp.lstrip("•- ")
-        bp_lines = wrap_text(f"—  {cleaned_bp}", sub_font, right_w, draw)
+        draw.ellipse([right_x, bp_y + 8, right_x + 8, bp_y + 16], fill=primary_light)
+        bp_lines = wrap_text(cleaned_bp, sub_font, right_w - 24, draw)
         for bp_l in bp_lines[:1]:
-            draw.text((right_x, bp_y), shape_arabic(bp_l), font=sub_font, fill=(203, 213, 225))
-            bp_y += 50
+            draw.text((right_x + 20, bp_y), shape_arabic(bp_l), font=sub_font, fill=(226, 232, 240))
+            bp_y += 56
+
+    # Tags
+    tx = right_x
+    for tag in sector_tags[:3]:
+        t_text = shape_arabic(tag)
+        tb = draw.textbbox((0, 0), t_text, font=role_font)
+        tw = tb[2] - tb[0]
+        draw.rounded_rectangle([tx, stat_y + stat_h - 45, tx + tw + 22, stat_y + stat_h - 12], radius=6, fill=(18, 28, 48), outline=(45, 68, 105), width=1)
+        draw.text((tx + 11, stat_y + stat_h - 40), t_text, font=role_font, fill=(148, 163, 184))
+        tx += tw + 28
 
     # 6. Floating Signature Bar (Capsule)
-    draw.rounded_rectangle([70, height - 90, width - 70, height - 25], radius=14, fill=(18, 24, 35), outline=(35, 46, 65), width=1)
+    draw.rounded_rectangle([70, height - 90, width - 70, height - 25], radius=14, fill=(16, 24, 40), outline=(255, 255, 255, 30), width=1)
 
     if AVATAR_PATH.exists():
         try:
@@ -400,7 +479,7 @@ def _render_bold_statement_hero(
         src_text = shape_arabic(f"المصدر المعتمد: {source_name}")
         src_bbox = draw.textbbox((0, 0), src_text, font=role_font)
         src_w = src_bbox[2] - src_bbox[0]
-        draw.text((width - 95 - src_w, height - 65), src_text, font=role_font, fill=(100, 116, 139))
+        draw.text((width - 95 - src_w, height - 65), src_text, font=role_font, fill=(148, 163, 184))
 
     img.save(target_path, quality=98)
     return target_path
@@ -422,21 +501,24 @@ def _render_cyber_radar_cockpit(
     bullet_points: List[str],
     sector_tags: List[str],
     source_name: str,
-    primary: tuple,
-    primary_light: tuple,
-    accent: tuple,
+    theme: dict,
     target_path: Path,
+    background_image_path: Optional[Path] = None,
 ) -> Path:
-    # 1. Dark Carbon Matrix
-    img = Image.new("RGB", (width, height), (8, 12, 20))
+    primary = theme.get("primary", (6, 182, 212))
+    primary_light = theme.get("primary_light", (103, 232, 249))
+    accent = theme.get("accent", (168, 85, 247))
+
+    # 1. Blended Mesh Canvas
+    img = create_blended_canvas(width, height, theme, background_image_path=background_image_path, dim_factor=0.32)
     draw = ImageDraw.Draw(img)
 
     # 2. Subtle Tech Grid Lines
-    grid_color = (16, 24, 40)
+    grid_color = (20, 30, 50, 40)
     for gx in range(0, width, 60):
-        draw.line([(gx, 0), (gx, height)], fill=grid_color, width=1)
+        draw.line([(gx, 0), (gx, height)], fill=(20, 32, 52), width=1)
     for gy in range(0, height, 60):
-        draw.line([(0, gy), (width, gy)], fill=grid_color, width=1)
+        draw.line([(0, gy), (width, gy)], fill=(20, 32, 52), width=1)
 
     # 3. Corner HUD Brackets
     hud_c = primary
@@ -571,25 +653,28 @@ def _render_magazine_asymmetric_cover(
     bullet_points: List[str],
     sector_tags: List[str],
     source_name: str,
-    primary: tuple,
-    primary_light: tuple,
+    theme: dict,
     target_path: Path,
+    background_image_path: Optional[Path] = None,
 ) -> Path:
-    # 1. Base Slate Canvas
-    img = Image.new("RGB", (width, height), (15, 20, 30))
+    primary = theme.get("primary", (16, 185, 129))
+    primary_light = theme.get("primary_light", (52, 211, 153))
+
+    # 1. Base Blended Mesh Canvas for the right side
+    img = create_blended_canvas(width, height, theme, background_image_path=background_image_path, dim_factor=0.35)
     draw = ImageDraw.Draw(img)
 
-    # 2. Asymmetric Solid Color Block (Left 38% of screen)
+    # 2. Asymmetric Gradient Block (Left 38% of screen) - Rich vertical blended gradient
     block_w = 460
-    draw.rectangle([0, 0, block_w, height], fill=primary)
+    for y in range(height):
+        t = y / height
+        r = int(primary[0] * (1 - t * 0.65) + 10 * (t * 0.65))
+        g = int(primary[1] * (1 - t * 0.65) + 18 * (t * 0.65))
+        b = int(primary[2] * (1 - t * 0.65) + 32 * (t * 0.65))
+        draw.line([(0, y), (block_w, y)], fill=(r, g, b))
 
-    # Dark gradient overlay on the color block bottom for contrast
-    for y in range(height - 180, height):
-        alpha = int((y - (height - 180)) / 180 * 120)
-        draw.line([(0, y), (block_w, y)], fill=(int(primary[0] * 0.4), int(primary[1] * 0.4), int(primary[2] * 0.4)))
-
-    # White dividing accent line
-    draw.line([(block_w, 0), (block_w, height)], fill=(255, 255, 255), width=2)
+    # Sleek frosted divider line
+    draw.line([(block_w, 0), (block_w, height)], fill=(255, 255, 255, 70), width=2)
 
     # Fonts
     tag_font = _get_font(18)
@@ -599,21 +684,21 @@ def _render_magazine_asymmetric_cover(
     name_font = _get_font(22)
 
     # 3. Inside the Vibrant Color Block
-    # Category badge in stark contrast
-    draw.rounded_rectangle([45, 45, block_w - 45, 90], radius=8, fill=(0, 0, 0), outline=(255, 255, 255), width=1)
-    draw.text((65, 54), shape_arabic(category_badge or "التقنية والابتكار | TECH"), font=tag_font, fill=(255, 255, 255))
+    # Category badge capsule
+    draw.rounded_rectangle([45, 45, block_w - 45, 90], radius=10, fill=(10, 20, 32), outline=(255, 255, 255, 40), width=1)
+    draw.text((65, 54), shape_arabic(category_badge or "التقنية والابتكار | TECH"), font=tag_font, fill=primary_light)
 
     # Giant Metric Value in stark white
-    draw.text((45, 175), shape_arabic(metric_label or "قيمة الإنجاز"), font=tag_font, fill=(240, 253, 250))
+    draw.text((45, 175), shape_arabic(metric_label or "قيمة الإنجاز"), font=tag_font, fill=(209, 250, 229))
 
     display_metric = metric_value.strip() if metric_value else "LEADERSHIP"
     m_font = _fit_metric_font(draw, display_metric, block_w - 90, base_size=56)
     draw.text((45, 220), display_metric, font=m_font, fill=(255, 255, 255))
 
-    draw.text((45, 330), shape_arabic(metric_sub or "السوق الخليجي"), font=sub_font, fill=(255, 255, 255))
+    draw.text((45, 330), shape_arabic(metric_sub or "السوق الخليجي"), font=sub_font, fill=(240, 253, 250))
 
     # Event badge pill at bottom of color block
-    draw.rounded_rectangle([45, 520, block_w - 45, 570], radius=8, fill=(255, 255, 255))
+    draw.rounded_rectangle([45, 520, block_w - 45, 570], radius=10, fill=(255, 255, 255))
     draw.text((65, 532), shape_arabic(event_badge or "تطور استراتيجي بارز"), font=tag_font, fill=(15, 20, 30))
 
     # 4. Right Side (Dark High-Contrast Section: 62%)
@@ -627,15 +712,16 @@ def _render_magazine_asymmetric_cover(
         draw.text((right_x, curr_y), shape_arabic(h_line), font=title_font, fill=(255, 255, 255))
         curr_y += 56
 
-    draw.line([(right_x, curr_y + 15), (width - 60, curr_y + 15)], fill=(40, 50, 70), width=1)
+    draw.line([(right_x, curr_y + 15), (width - 60, curr_y + 15)], fill=(40, 56, 80), width=1)
 
     # Bullet Points
     bp_y = curr_y + 35
     for bp in bullet_points[:3]:
         cleaned_bp = bp.lstrip("•- ")
-        bp_lines = wrap_text(f"•  {cleaned_bp}", sub_font, right_w, draw)
+        draw.ellipse([right_x, bp_y + 8, right_x + 8, bp_y + 16], fill=primary_light)
+        bp_lines = wrap_text(cleaned_bp, sub_font, right_w - 24, draw)
         for bp_l in bp_lines[:1]:
-            draw.text((right_x, bp_y), shape_arabic(bp_l), font=sub_font, fill=(203, 213, 225))
+            draw.text((right_x + 20, bp_y), shape_arabic(bp_l), font=sub_font, fill=(226, 232, 240))
             bp_y += 46
 
     # Tags
@@ -644,12 +730,12 @@ def _render_magazine_asymmetric_cover(
         t_text = shape_arabic(tag)
         tb = draw.textbbox((0, 0), t_text, font=role_font)
         tw = tb[2] - tb[0]
-        draw.rounded_rectangle([tx, 490, tx + tw + 22, 525], radius=6, fill=(25, 33, 50), outline=(45, 60, 85), width=1)
-        draw.text((tx + 11, 498), t_text, font=role_font, fill=(148, 163, 184))
+        draw.rounded_rectangle([tx, 495, tx + tw + 22, 530], radius=6, fill=(18, 28, 48), outline=(45, 68, 105), width=1)
+        draw.text((tx + 11, 503), t_text, font=role_font, fill=(148, 163, 184))
         tx += tw + 28
 
     # 5. Author Branding Bar
-    draw.line([(right_x, 570), (width - 60, 570)], fill=(35, 45, 65), width=1)
+    draw.line([(right_x, 575), (width - 60, 575)], fill=(35, 48, 70), width=1)
 
     if AVATAR_PATH.exists():
         try:
@@ -671,10 +757,11 @@ def _render_magazine_asymmetric_cover(
         src_text = shape_arabic(f"المصدر المعتمد: {source_name}")
         src_bbox = draw.textbbox((0, 0), src_text, font=role_font)
         src_w = src_bbox[2] - src_bbox[0]
-        draw.text((width - 60 - src_w, 620), src_text, font=role_font, fill=(100, 116, 139))
+        draw.text((width - 60 - src_w, 620), src_text, font=role_font, fill=(148, 163, 184))
 
     img.save(target_path, quality=98)
     return target_path
+
 
 
 # ---------------------------------------------------------------------------
@@ -887,10 +974,12 @@ def render_editorial_news_card(
     theme_name: str = "auto",
     layout_archetype: str = "auto",
     target_path: Optional[Path] = None,
+    background_image_path: Optional[Path] = None,
 ) -> Path:
     """
     Renders a pristine 16:9 (1280x720) executive news card.
     Dynamically alternates between 5 distinct design paradigms and 8 color themes.
+    Employs blended mesh gradients and translucent frosted glass styling.
     """
     if bullet_points is None:
         bullet_points = []
@@ -960,9 +1049,9 @@ def render_editorial_news_card(
             bullet_points=bullet_points,
             sector_tags=sector_tags,
             source_name=source_name,
-            primary=primary,
-            primary_light=primary_light,
+            theme=theme,
             target_path=target_path,
+            background_image_path=background_image_path,
         )
 
     if layout_archetype == "cyber_radar_cockpit":
@@ -979,10 +1068,9 @@ def render_editorial_news_card(
             bullet_points=bullet_points,
             sector_tags=sector_tags,
             source_name=source_name,
-            primary=primary,
-            primary_light=primary_light,
-            accent=accent,
+            theme=theme,
             target_path=target_path,
+            background_image_path=background_image_path,
         )
 
     if layout_archetype == "magazine_asymmetric_cover":
@@ -999,36 +1087,22 @@ def render_editorial_news_card(
             bullet_points=bullet_points,
             sector_tags=sector_tags,
             source_name=source_name,
-            primary=primary,
-            primary_light=primary_light,
+            theme=theme,
             target_path=target_path,
+            background_image_path=background_image_path,
         )
 
-    # --- Paradigm 5: Classic Glassmorphic Split Designs ---
-    img = Image.new("RGB", (width, height), (11, 15, 25))
-
-    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    glow_draw = ImageDraw.Draw(glow)
-    if layout_archetype == "split_right":
-        glow_draw.ellipse([-100, -150, 450, 350], fill=theme["glow"])
-        glow_draw.ellipse([800, 420, 1450, 950], fill=theme["secondary_glow"])
-    elif layout_archetype == "hero_top":
-        glow_draw.ellipse([350, -200, 950, 250], fill=theme["glow"])
-        glow_draw.ellipse([100, 420, 1150, 950], fill=theme["secondary_glow"])
-    else:  # split_left
-        glow_draw.ellipse([850, -150, 1400, 350], fill=theme["glow"])
-        glow_draw.ellipse([-100, 420, 550, 950], fill=theme["secondary_glow"])
-
-    glow = glow.filter(ImageFilter.GaussianBlur(95))
-    img.paste(glow, (0, 0), glow)
-
+    # --- Paradigm 5: Classic Glassmorphic Split Designs on Blended Canvas ---
+    img = create_blended_canvas(width, height, theme, background_image_path=background_image_path, dim_factor=0.38)
     draw = ImageDraw.Draw(img)
+
+    # Top delicate glowing accent line
     for x in range(width):
         ratio = x / width
         r = int(primary[0] * (1 - ratio) + accent[0] * ratio)
         g = int(primary[1] * (1 - ratio) + accent[1] * ratio)
         b = int(primary[2] * (1 - ratio) + accent[2] * ratio)
-        draw.line([(x, 0), (x, 4)], fill=(r, g, b))
+        draw.line([(x, 0), (x, 3)], fill=(r, g, b))
 
     fonts = {
         "title": _get_font(36),
@@ -1040,27 +1114,30 @@ def render_editorial_news_card(
         "role": _get_font(16),
     }
 
-    # Top Header Badges
+    # Top Header Floating Pills
     cat_text = shape_arabic(category_badge or "التقنية المالية والتمويل | FINTECH")
     cat_bbox = draw.textbbox((0, 0), cat_text, font=fonts["tag"])
     cat_w = cat_bbox[2] - cat_bbox[0]
     cat_x = width - 70 - cat_w
-    draw.rounded_rectangle([cat_x - 18, 40, width - 52, 78], radius=8, fill=(15, 28, 42), outline=primary, width=1)
+    draw.rounded_rectangle([cat_x - 18, 40, width - 52, 78], radius=18, fill=(16, 24, 40), outline=(255, 255, 255, 35), width=1)
     draw.ellipse([width - 68, 55, width - 60, 63], fill=primary_light)
-    draw.text((cat_x - 8, 46), cat_text, font=fonts["tag"], fill=primary_light)
+    draw.text((cat_x - 8, 46), cat_text, font=fonts["tag"], fill=(255, 255, 255))
 
     event_text = shape_arabic(event_badge or "تطور تقني جديد • MARKET UPDATE")
     event_bbox = draw.textbbox((0, 0), event_text, font=fonts["tag"])
     event_w = event_bbox[2] - event_bbox[0]
-    draw.rounded_rectangle([52, 40, 52 + event_w + 40, 78], radius=8, fill=(28, 24, 14), outline=accent, width=1)
+    draw.rounded_rectangle([52, 40, 52 + event_w + 40, 78], radius=18, fill=(16, 24, 40), outline=(255, 255, 255, 35), width=1)
     draw.ellipse([66, 55, 74, 63], fill=accent)
     draw.text((84, 46), event_text, font=fonts["tag"], fill=accent)
 
-    # Main Card Panel
-    panel = Image.new("RGBA", (width - 104, 450), (17, 24, 39, 215))
+    # Frosted Glass Main Card Panel (Translucent RGBA with refined border)
+    panel_w = width - 104
+    panel_h = 455
+    panel = Image.new("RGBA", (panel_w, panel_h), (11, 17, 30, 190))
     panel_draw = ImageDraw.Draw(panel)
-    panel_draw.rounded_rectangle([0, 0, width - 104, 450], radius=16, outline=(38, 50, 75), width=1)
-    img.paste(panel, (52, 105), panel)
+    panel_draw.rounded_rectangle([0, 0, panel_w, panel_h], radius=18, outline=(255, 255, 255, 38), width=1)
+    panel_draw.rounded_rectangle([1, 1, panel_w - 1, panel_h - 1], radius=17, outline=(primary[0], primary[1], primary[2], 25), width=1)
+    img.paste(panel, (52, 102), panel)
 
     draw = ImageDraw.Draw(img)
 
@@ -1114,19 +1191,20 @@ def render_editorial_news_card(
     # Bottom Footer Bar (Author Branding + Verified Checkmark + Source)
     if AVATAR_PATH.exists():
         try:
-            av = Image.open(AVATAR_PATH).convert("RGBA").resize((68, 68), Image.Resampling.LANCZOS)
-            mask = Image.new("L", (68, 68), 0)
+            av = Image.open(AVATAR_PATH).convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (64, 64), 0)
             mask_draw = ImageDraw.Draw(mask)
-            mask_draw.ellipse([0, 0, 68, 68], fill=255)
-            draw.ellipse([52 - 3, height - 90 - 3, 52 + 68 + 3, height - 90 + 68 + 3], fill=primary)
-            img.paste(av, (52, height - 90), mask)
+            mask_draw.ellipse([0, 0, 64, 64], fill=255)
+            draw.ellipse([52 - 2, height - 88 - 2, 52 + 64 + 2, height - 88 + 64 + 2], fill=primary)
+            img.paste(av, (52, height - 88), mask)
         except Exception as e:
             logger.debug("Could not paste avatar: %s", e)
 
     auth_name = "Mohamed Elbaloty"
-    draw.text((135, height - 85), auth_name, font=fonts["name"], fill=(255, 255, 255))
-    auth_title = "CTO @ Sahalat"
-    draw.text((135, height - 58), auth_title, font=fonts["role"], fill=(148, 163, 184))
+    draw.text((130, height - 85), auth_name, font=fonts["name"], fill=(255, 255, 255))
+    auth_title = "•  CTO @ Sahalat"
+    auth_w = draw.textbbox((0, 0), auth_name, font=fonts["name"])[2] - draw.textbbox((0, 0), auth_name, font=fonts["name"])[0]
+    draw.text((130 + auth_w + 12, height - 80), auth_title, font=fonts["role"], fill=(148, 163, 184))
 
     if source_name:
         src_text = shape_arabic(f"المصدر المعتمد: {source_name}")
@@ -1141,3 +1219,4 @@ def render_editorial_news_card(
 
 # Public Aliases
 create_executive_news_card = render_editorial_news_card
+

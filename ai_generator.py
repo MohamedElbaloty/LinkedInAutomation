@@ -127,7 +127,8 @@ class AIGenerator:
             "10. 'bullet_points': 2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card.\n"
             "11. 'sector_tags': 3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce'].\n"
             "12. 'theme_name': Choose dynamically from ['fintech_emerald', 'saudi_gold', 'ai_cyan', 'proptech_amber', 'deeptech_purple', 'bloomberg_orange', 'crimson_pulse', 'midnight_sapphire']. Select the most appropriate color theme for the sector.\n"
-            "13. 'layout_archetype': Choose dynamically from ['executive_broadsheet', 'bold_statement_hero', 'cyber_radar_cockpit', 'magazine_asymmetric_cover', 'split_left', 'split_right', 'hero_top'] to give each news card a radically unique visual identity.\n\n"
+            "13. 'layout_archetype': Choose dynamically from ['executive_broadsheet', 'bold_statement_hero', 'cyber_radar_cockpit', 'magazine_asymmetric_cover', 'split_left', 'split_right', 'hero_top'] to give each news card a radically unique visual identity.\n"
+            "14. 'image_prompt': A sophisticated, non-cliché English prompt for a prestigious 3D executive architectural visual representing the strategic core of the article (minimalist frosted glass prisms, polished anodized titanium blocks, flowing digital infrastructure ribbons, caustic light refractions, harmonious blended lighting, Dieter Rams/Apple aesthetic, NO cartoon robots, NO glowing brains, NO floating coins, NO text/letters).\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
             "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
             "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"
@@ -276,6 +277,34 @@ class AIGenerator:
             return target_path
         raise RuntimeError(f"FLUX.1 generation returned status {response.status_code}")
 
+    def build_smart_tech_prompt(self, article: Article, content_result: Optional[GenerationResult] = None) -> str:
+        """
+        Synthesizes a masterclass, non-cliché 3D architectural visual prompt for Nano Banana Pro (gemini-3-pro-image).
+        Ensures ultra-clean executive aesthetics with blended mesh lighting and zero AI clichés.
+        """
+        combined = ((getattr(content_result, "category_badge", "") if content_result else "") + " " + article.title + " " + (article.summary or "")).lower()
+
+        if any(k in combined for k in ["عقار", "عقاري", "أراضي", "proptech", "real estate", "property"]):
+            theme_subject = "futuristic architectural monoliths of tinted obsidian glass and warm bronze structures representing digital property technology and urban spatial infrastructure"
+            lighting = "deep midnight navy smoothly bleeding into warm amber gold and bronze refractions"
+        elif any(k in combined for k in ["ذكاء", "حوسبة", "ai", "llm", "agent", "compute", "data center", "cloud"]):
+            theme_subject = "minimalist 3D architectural composition of frosted translucent glass prisms, polished anodized titanium blocks, and flowing ribbon-like geometric mesh structures representing neural compute clusters and optical networks"
+            lighting = "deep royal navy bleeding into electric cyan and soft ethereal violet"
+        elif any(k in combined for k in ["تمويل", "فنتك", "بنك", "مدفوعات", "fintech", "payment", "banking", "capital"]):
+            theme_subject = "minimalist architectural composition of frosted glass prisms, glowing optical fiber conduits, and polished anodized titanium monoliths representing unified digital payments and financial infrastructure"
+            lighting = "deep royal navy transitioning into vivid emerald green and warm gold caustic reflections"
+        else:
+            theme_subject = "minimalist 3D executive architectural composition of monolithic translucent glass cubes, polished brushed aluminum slabs, and smooth flowing ribbon geometries representing modern digital enterprise transformation"
+            lighting = "deep navy bleeding into radiant gold and electric sapphire"
+
+        return (
+            f"A prestigious 3D technology brand visual for LinkedIn executive editorial, representing {article.title[:80]}. "
+            f"{theme_subject}. Lighting: harmonious blended gradients of {lighting}. "
+            "Soft studio lighting, caustic light refractions through the glass, clean, pure, uncluttered, ultra-sharp 8k render, "
+            "Dieter Rams and Apple aesthetic, pristine surfaces. "
+            "Negative prompt: absolutely no robots, no humans, no faces, no glowing brains, no floating coins, no currency symbols, no text, no letters, no logos."
+        )
+
     def _generate_gflow_image(self, prompt: str, target_path: Path) -> Path:
         """
         Generates an image directly through Google Flow Pro using the true 'Nano Banana Pro 🍌' model.
@@ -295,24 +324,17 @@ class AIGenerator:
 
         from image_watermark import stamp_author_branding
 
-        # 1. Absolute First Priority: True Google Flow Pro 'Nano Banana Pro 🍌' model
-        try:
-            raw_path = self._generate_gflow_image(prompt, target_path)
-            return stamp_author_branding(raw_path)
-        except Exception as e:
-            logger.warning("Google Flow Nano Banana Pro generation failed: %s. Falling back to Google GenAI API...", str(e)[:150])
-
-        # 2. Second Priority: Google GenAI API Image models (Nano Banana Pro / DeepMind)
+        # 1. First Priority: Google GenAI API Image models (Official Nano Banana Pro / Imagen 3)
         candidate_models = [
-            "nano-banana-pro-preview",
             "gemini-3-pro-image",
-            self.image_model,
             "gemini-3.1-flash-image",
+            "gemini-2.5-flash-image",
+            self.image_model,
         ]
         candidate_models = list(dict.fromkeys(candidate_models))
 
         for model_name in candidate_models:
-            logger.info("Generating studio visual with %s...", model_name)
+            logger.info("Generating studio visual with Nano Banana Pro model: %s...", model_name)
             try:
                 response = self.client.models.generate_content(
                     model=model_name,
@@ -333,7 +355,14 @@ class AIGenerator:
                 logger.warning("Generation with %s encountered an issue: %s", model_name, str(e)[:150])
                 continue
 
-        # If Google models fail, use FLUX.1
+        # 2. Second Priority: Direct Google Flow Pro automation
+        try:
+            raw_path = self._generate_gflow_image(prompt, target_path)
+            return stamp_author_branding(raw_path)
+        except Exception as e:
+            logger.warning("Google Flow Nano Banana Pro generation failed: %s", str(e)[:150])
+
+        # 3. Third Priority: FLUX.1
         try:
             raw_path = self._generate_flux_image(prompt, target_path)
             return stamp_author_branding(raw_path)
@@ -346,10 +375,38 @@ class AIGenerator:
         """
         Renders a Bloomberg/Forbes Middle East-grade editorial news card with Arabic typography,
         numerical stat callouts, sector badges, and executive author signature.
+        Seamlessly integrates 3D Banana Pro backdrops behind frosted glass panels.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{article.id[:16]}.jpg"
         target_path = output_dir / filename
+
+        # 1. Attempt to generate or reuse a pristine 3D executive visual backdrop via gemini-3-pro-image (Nano Banana Pro)
+        bg_visual_path = None
+        try:
+            bg_target = output_dir / f"bg_{article.id[:14]}.jpg"
+            if not bg_target.exists():
+                prompt_3d = self.build_smart_tech_prompt(article, content_result)
+                logger.info("Synthesizing smart 3D visual backdrop via Nano Banana Pro (gemini-3-pro-image)...")
+                response = self.client.models.generate_content(
+                    model="gemini-3-pro-image",
+                    contents=prompt_3d,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                    ),
+                )
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
+                            img_3d = Image.open(io.BytesIO(part.inline_data.data))
+                            img_3d.save(bg_target, format="JPEG", quality=92)
+                            bg_visual_path = bg_target
+                            logger.info("Nano Banana Pro 3D visual backdrop generated: %s", bg_target)
+                            break
+            else:
+                bg_visual_path = bg_target
+        except Exception as e:
+            logger.info("3D visual backdrop skipped/fallback (%s). Rendering pure blended mesh gradient.", str(e)[:120])
 
         try:
             from news_card_designer import render_editorial_news_card
@@ -367,10 +424,12 @@ class AIGenerator:
                 theme_name=getattr(content_result, "theme_name", "auto") or "auto",
                 layout_archetype=getattr(content_result, "layout_archetype", "auto") or "auto",
                 target_path=target_path,
+                background_image_path=bg_visual_path,
             )
         except Exception as e:
             logger.error("Failed to render executive news card: %s. Falling back to diffusion visual.", e, exc_info=True)
             return self.generate_image(content_result.image_prompt or article.title, article.id, output_dir)
+
 
 
 def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, any]:

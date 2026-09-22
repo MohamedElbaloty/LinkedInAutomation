@@ -81,6 +81,7 @@ def escape_linkedin_commentary(text: str) -> str:
     if not text:
         return ""
     # Normalize existing escapes to avoid double-escaping
+    cleaned = re.sub(r"\\([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))", r"\1", str(text))
     return LINKEDIN_LITTLE_TEXT_ESCAPE_RE.sub(r"\\\1", cleaned)
 
 

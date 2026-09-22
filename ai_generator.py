@@ -8,7 +8,7 @@ import io
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from PIL import Image
 
 from google import genai
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenerationResult(BaseModel):
-    """Pydantic model for structured Gemini post generation."""
+    """Pydantic model for structured Gemini post generation and news card design."""
     short_hook: str = Field(
         description="A punchy 1-2 sentence hook in Arabic summarizing the breakthrough."
     )
@@ -42,16 +42,39 @@ class GenerationResult(BaseModel):
     telegram_caption: str = Field(
         description="A concise version of the news in Arabic (strictly under 950 characters) designed specifically as a single Telegram photo caption."
     )
-    visual_archetype: str = Field(
-        description=(
-            "The creative visual archetype selected specifically for this story: "
-            "choose from ['editorial_hero', 'fintech_liquid_glass', 'proptech_smart_city', 'futuristic_silicon', 'minimalist_data_metric']."
-        )
+    card_headline: str = Field(
+        description="A bold, crisp Arabic headline for the graphic news card (max 8-10 words)."
     )
-    image_prompt: str = Field(
-        description=(
-            "A bespoke English prompt crafted according to the chosen visual archetype to produce a breathtaking, modern, scroll-stopping visual for LinkedIn."
-        )
+    card_sub_headline: str = Field(
+        description="Secondary line for the headline (e.g. key investor, partner, or strategic outcome in Arabic)."
+    )
+    category_badge: str = Field(
+        description="Sector category in Arabic & English, e.g. 'التقنية المالية والتمويل | FINTECH & VC' or 'ذكاء اصطناعي وحوسبة | AI & COMPUTE' or 'بروب تك وعقارات ذكية | PROPTECH'."
+    )
+    event_badge: str = Field(
+        description="Event type badge, e.g. 'جولة تمويلية جديدة • PRE-SERIES C' or 'قفزة تقنية فائقة • BREAKTHROUGH' or 'تنظيمات ساما • SAMA REGULATION'."
+    )
+    metric_value: str = Field(
+        description="Primary numerical or key stat callout, e.g. '$35,000,000' or '$329.5M' or 'MMLU 92.4%' or 'SAR 120B' or 'v2.0'."
+    )
+    metric_label: str = Field(
+        description="Short Arabic label for the metric, e.g. 'قيمة التمويل الاستثماري' or 'معيار كفاءة الاستدلال' or 'حجم المشروع'."
+    )
+    metric_sub: str = Field(
+        description="Sub-label under the metric, e.g. 'Pre-Series C • مبادلة + EBRD' or 'Test-Time Compute' or 'السوق السعودي'."
+    )
+    bullet_points: List[str] = Field(
+        description="2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card."
+    )
+    sector_tags: List[str] = Field(
+        description="3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce']."
+    )
+    theme_name: str = Field(
+        description="Color theme matching the sector: 'fintech_emerald', 'ai_cyan', 'proptech_amber', 'saudi_gold', or 'deeptech_purple'."
+    )
+    image_prompt: Optional[str] = Field(
+        default="",
+        description="Optional English prompt."
     )
 
     @property
@@ -89,8 +112,16 @@ class AIGenerator:
             "and produce:\n"
             "1. 'linkedin_post': An authoritative, viral, and deeply detailed LinkedIn post (1,500 to 2,500 characters) in clear, modern Arabic blended naturally with standard English technical/business terminology. Do NOT write a superficial summary! Provide deep architectural analysis, regulatory/market context, and actionable takeaways.\n"
             "2. 'telegram_caption': A punchy, condensed version of the post (strictly under 950 characters) suitable as a single Telegram photo caption.\n"
-            "3. 'visual_archetype': The best visual archetype fitting this story from ['editorial_hero', 'fintech_liquid_glass', 'proptech_smart_city', 'futuristic_silicon', 'minimalist_data_metric'].\n"
-            "4. 'image_prompt': A bespoke, scroll-stopping English visual prompt tailored to that archetype.\n\n"
+            "3. 'card_headline': A bold, crisp Arabic headline for the visual news card (max 8-10 words).\n"
+            "4. 'card_sub_headline': A secondary line for the card headline (e.g. key investor, partner, or strategic outcome in Arabic).\n"
+            "5. 'category_badge': Sector category, e.g. 'التقنية المالية والتمويل | FINTECH & VC' or 'ذكاء اصطناعي وحوسبة | AI & COMPUTE' or 'بروب تك وعقارات ذكية | PROPTECH'.\n"
+            "6. 'event_badge': Event badge, e.g. 'جولة تمويلية جديدة • PRE-SERIES C' or 'تطور تقني فائق • BREAKTHROUGH' or 'تنظيمات ساما • SAMA REGULATION'.\n"
+            "7. 'metric_value': The single most prominent number/stat from the article (e.g. '$35,000,000' or '$329.5M' or 'MMLU 92.4%' or 'SAR 120B').\n"
+            "8. 'metric_label': Arabic label for the metric (e.g. 'قيمة التمويل الاستثماري' or 'معيار كفاءة الاستدلال').\n"
+            "9. 'metric_sub': Sub-label under metric (e.g. 'Pre-Series C • مبادلة + EBRD' or 'السوق السعودي').\n"
+            "10. 'bullet_points': 2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card.\n"
+            "11. 'sector_tags': 3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce'].\n"
+            "12. 'theme_name': Choose from ['fintech_emerald', 'ai_cyan', 'proptech_amber', 'saudi_gold', 'deeptech_purple'].\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
             "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
             "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"
@@ -101,33 +132,7 @@ class AIGenerator:
             "- 📌 Source Attribution: Clearly state the news source at the end:\n"
             "  '📌 المصدر: [اسم المصدر - Source Name] | [عنوان الخبر المرجعي]'\n"
             "- 🏷️ Hashtags: Include targeted hashtags for Saudi, GCC, FinTech, and PropTech:\n"
-            "  #فنتك #بروب_تك #التقنية_العقارية #التقنية_المالية #السعودية #رؤية_السعودية_2030 #Fintech #Proptech #SaudiTech #GCC #AI #SoftwareEngineering\n\n"
-            "SMART DYNAMIC VISUAL ART DIRECTION (LINKEDIN SCROLL-STOPPING VISUALS):\n"
-            "DO NOT create generic, repetitive 3-card infographic slides for every post. "
-            "You are also the Chief Creative Director for Mohamed Elbaloty's personal brand. "
-            "Your visual goal is to create modern, bespoke, editorial-grade visuals (like Wired, Bloomberg Businessweek, Fast Company, or Apple Keynote) "
-            "that immediately captivate executives, founders, and engineers scrolling through their LinkedIn feeds.\n\n"
-            "Select the single best 'visual_archetype' from the 5 options below that most powerfully visualizes this specific story, "
-            "and craft a cinematic, highly detailed English 'image_prompt':\n\n"
-            "1. 'editorial_hero' (Cinematic Magazine Cover / Conceptual Hero Visual):\n"
-            "   - Best for: Landmark AI model announcements, major startup funding rounds ($50M+), sovereign AI initiatives, major strategic shifts.\n"
-            "   - Composition: A stunning 3D conceptual metaphor of the breakthrough. Dramatic volumetric studio lighting, deep obsidian or slate background, warm amber and electric cyan accent lights, shallow depth of field, sleek minimalism. Looks like a premier magazine cover story, NOT a presentation slide.\n\n"
-            "2. 'fintech_liquid_glass' (Futuristic Neo-Banking & Liquid Glassmorphism):\n"
-            "   - Best for: FinTech, SAMA Open Banking, payment platforms (Paymob, Tabby, Tamara, Barq), digital wallets, payment orchestration, banking APIs, embedded finance.\n"
-            "   - Composition: Translucent frosted glassmorphism interface panels floating in 3D space, luminous golden and emerald currency/data streams, holographic payment cards, microchip circuits, isometric banking infrastructure, ultra-luxurious dark mode aesthetic.\n\n"
-            "3. 'proptech_smart_city' (3D Digital Twin & Autonomous Architecture):\n"
-            "   - Best for: PropTech, smart city tech, ROSHN, NEOM The Line, Red Sea Project, real estate tokenization, AI property valuation, REGA platforms.\n"
-            "   - Composition: Photorealistic 3D architectural rendering of futuristic sustainable glass towers in Riyadh or NEOM at twilight, glowing isometric digital twin wireframe layers, holographic floorplan & valuation data HUD overlays, warm sunset reflections on curved glass facades.\n\n"
-            "4. 'futuristic_silicon' (Neural Computing & Quantum Hardware Concept):\n"
-            "   - Best for: LLM inference engines, GPU clusters, chip architecture, autonomous agentic workflows, algorithm benchmarks.\n"
-            "   - Composition: Macro lens perspective of a futuristic glowing silicon quantum wafer, intricate holographic light pathways, translucent glass nodes with data pulses, cinematic chiaroscuro lighting, Apple Pro hardware industrial design.\n\n"
-            "5. 'minimalist_data_metric' (Dark Minimalist Data Art & Stat Highlight):\n"
-            "   - Best for: Market reports, funding amounts (e.g. $329.5M, $50M), percentage leaps (+180%), statistical comparisons.\n"
-            "   - Composition: Ultra-clean dark-mode data visualization inspired by Linear.app and Apple Keynote. Prominent glowing typography for key numbers, sleek circular metric gauges, subtle gradient glow, dark matte backdrop with crisp modern geometric accents.\n\n"
-            "CRITICAL IMAGE PROMPT RULES:\n"
-            "- Do NOT generate a generic 3-card slide presentation unless 'minimalist_data_metric' specifically demands it.\n"
-            "- Format as a 16:9 widescreen composition with ample negative space and cinematic lighting.\n"
-            "- Emphasize modern, premium, high-contrast aesthetics that stop people from scrolling on LinkedIn.\n"
+            "  #فنتك #بروب_تك #التقنية_العقارية #التقنية_المالية #السعودية #رؤية_السعودية_2030 #Fintech #Proptech #SaudiTech #GCC #AI #SoftwareEngineering\n"
         )
 
         user_content = (
@@ -331,17 +336,46 @@ class AIGenerator:
             raw_path = self._generate_fallback_image(prompt, target_path)
             return stamp_author_branding(raw_path)
 
+    def generate_news_card(self, content_result: GenerationResult, article: Article, output_dir: Path = IMAGES_DIR) -> Path:
+        """
+        Renders a Bloomberg/Forbes Middle East-grade editorial news card with Arabic typography,
+        numerical stat callouts, sector badges, and executive author signature.
+        """
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{article.id[:16]}.jpg"
+        target_path = output_dir / filename
+
+        try:
+            from news_card_designer import render_editorial_news_card
+            return render_editorial_news_card(
+                headline_line1=getattr(content_result, "card_headline", None) or article.title,
+                headline_line2=getattr(content_result, "card_sub_headline", "") or "",
+                metric_value=getattr(content_result, "metric_value", "") or "GROWTH",
+                metric_label=getattr(content_result, "metric_label", "") or "مؤشر قطاعي رائد",
+                metric_sub=getattr(content_result, "metric_sub", "") or (article.source or "تحليل استراتيجي"),
+                category_badge=getattr(content_result, "category_badge", "") or "التقنية المالية والتمويل | FINTECH",
+                event_badge=getattr(content_result, "event_badge", "") or "تطور تقني جديد • MARKET UPDATE",
+                bullet_points=getattr(content_result, "bullet_points", None) or [article.title],
+                sector_tags=getattr(content_result, "sector_tags", None) or ["السوق السعودي", "الابتكار الرقمي", "رؤية 2030"],
+                source_name=article.source,
+                theme_name=getattr(content_result, "theme_name", "fintech_emerald") or "fintech_emerald",
+                target_path=target_path,
+            )
+        except Exception as e:
+            logger.error("Failed to render executive news card: %s. Falling back to diffusion visual.", e, exc_info=True)
+            return self.generate_image(content_result.image_prompt or article.title, article.id, output_dir)
+
 
 def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, any]:
     """
-    Convenience orchestrator for generating post copy, image prompt, and optionally generating the image file.
-    Returns a dictionary containing the post text, hook, image prompt, and image file path (or None if skip_image=True).
+    Convenience orchestrator for generating post copy, news card metadata, and generating the executive news card.
+    Returns a dictionary containing post text, hook, card info, and image file path (or None if skip_image=True).
     """
     generator = AIGenerator()
     content_result = generator.generate_post_and_prompt(article)
     image_path = None
     if not skip_image:
-        image_path = generator.generate_image(content_result.image_prompt, article.id)
+        image_path = generator.generate_news_card(content_result, article)
 
     return {
         "article": article,
@@ -349,8 +383,16 @@ def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, an
         "post_text": content_result.linkedin_post,
         "linkedin_post": content_result.linkedin_post,
         "telegram_caption": content_result.telegram_caption,
-        "visual_archetype": getattr(content_result, "visual_archetype", "editorial_hero"),
-        "image_prompt": content_result.image_prompt,
+        "visual_archetype": "executive_news_card",
+        "image_prompt": content_result.image_prompt or content_result.card_headline,
         "image_path": image_path,
+        "card_metadata": {
+            "headline": getattr(content_result, "card_headline", ""),
+            "sub_headline": getattr(content_result, "card_sub_headline", ""),
+            "metric_value": getattr(content_result, "metric_value", ""),
+            "metric_label": getattr(content_result, "metric_label", ""),
+            "theme": getattr(content_result, "theme_name", "fintech_emerald"),
+        },
     }
+
 

@@ -192,6 +192,22 @@ async def publish_now():
     return result
 
 
+@app.post("/api/publish-telegram")
+async def publish_telegram_only():
+    """
+    Triggers an immediate publishing cycle specifically to Telegram.
+    Fetches latest article, generates copy and image, sends to Telegram channel/bot.
+    """
+    if scheduler_service.is_running_job:
+        return JSONResponse(
+            status_code=409,
+            content={"success": False, "error": "A generation job is currently in progress. Please wait a moment."},
+        )
+
+    result = await scheduler_service.execute_telegram_job()
+    return result
+
+
 @app.post("/api/save-linkedin-token")
 async def save_linkedin_token(data: TokenUpdateRequest):
     """Saves LinkedIn OAuth Access Token to environment and config."""

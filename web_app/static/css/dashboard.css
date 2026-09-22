@@ -250,7 +250,15 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+}
+
+.hero-cta-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .cta-hint {
@@ -286,6 +294,21 @@ body {
 }
 
 .btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-telegram {
+    background: linear-gradient(135deg, #0088cc 0%, #29b6f6 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(0, 136, 204, 0.35);
+}
+
+.btn-telegram:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 136, 204, 0.5);
+}
+
+.btn-telegram:active {
     transform: translateY(0);
 }
 

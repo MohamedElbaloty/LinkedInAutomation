@@ -214,6 +214,93 @@ class GrowthSchedulerService:
 
         return result
 
+    async def execute_telegram_job(self) -> Dict[str, any]:
+        """Publishes directly and exclusively to Telegram with Nano Banana Pro infographic."""
+        if self.is_running_job:
+            logger.warning("A publishing job is already in progress. Skipping duplicate run.")
+            return {"success": False, "error": "Job already running"}
+
+        self.is_running_job = True
+        result = {
+            "success": False,
+            "timestamp": datetime.now().isoformat(),
+            "article_title": "",
+            "telegram_sent": False,
+            "error": None,
+        }
+
+        try:
+            logger.info("Triggering Telegram news discovery...")
+            article = get_latest_unread_article()
+            if not article:
+                logger.info("No unread AI/FinTech/PropTech articles found in configured feeds.")
+                result["error"] = "No new unread articles available"
+                return result
+
+            result["article_title"] = article.title
+            logger.info("Processing article for Telegram: '%s' from %s", article.title, article.source)
+
+            # 1. Generate post text & Nano Banana Pro image
+            loop = asyncio.get_running_loop()
+            bundle = await loop.run_in_executor(None, create_ai_bundle, article)
+
+            post_text = bundle.get("linkedin_post") or bundle.get("post_text", "")
+            telegram_caption = bundle.get("telegram_caption") or bundle.get("short_hook", "")
+            image_path = Path(bundle["image_path"])
+
+            # 2. Deliver to Telegram channel / chat
+            if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+                try:
+                    from telegram import Bot
+                    from telegram.constants import ParseMode
+
+                    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+                    caption = f"🚀 **[AI & FinTech GCC Intelligence]**\n{telegram_caption}"
+                    if len(caption) > 1020:
+                        caption = caption[:1017] + "..."
+
+                    if image_path.exists():
+                        with open(image_path, "rb") as pf:
+                            await bot.send_photo(
+                                chat_id=TELEGRAM_CHAT_ID,
+                                photo=pf,
+                                caption=caption,
+                                parse_mode=ParseMode.MARKDOWN,
+                            )
+                    else:
+                        await bot.send_message(
+                            chat_id=TELEGRAM_CHAT_ID,
+                            text=post_text,
+                            parse_mode=ParseMode.MARKDOWN,
+                        )
+                    result["telegram_sent"] = True
+                    result["success"] = True
+                    logger.info("Delivered live post to Telegram successfully!")
+                except Exception as tg_err:
+                    logger.error("Telegram delivery failed: %s", tg_err)
+                    result["error"] = f"Telegram error: {str(tg_err)}"
+                    return result
+            else:
+                result["error"] = "Telegram credentials (TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID) are missing."
+                return result
+
+            # 3. Mark article as posted in SQLite database
+            mark_as_posted(article.id, article.title, article.published_at)
+
+            # Update settings with last run
+            self.current_settings["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            save_schedule_settings(self.current_settings)
+
+            result["success"] = True
+
+        except Exception as e:
+            logger.error("Error executing Telegram publishing: %s", e, exc_info=True)
+            result["error"] = str(e)
+        finally:
+            self.is_running_job = False
+
+        return result
+
 
 # Global scheduler service instance
 scheduler_service = GrowthSchedulerService()

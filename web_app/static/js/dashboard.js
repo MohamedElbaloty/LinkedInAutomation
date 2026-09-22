@@ -156,6 +156,99 @@ async function triggerPublishNow() {
     }
 }
 
+// 2b. Publish Directly to Telegram
+async function triggerPublishTelegram() {
+    if (isPublishing) return;
+    isPublishing = true;
+
+    const btnLk = document.getElementById('btn-publish-now');
+    const btnTg = document.getElementById('btn-publish-telegram');
+    const progressBox = document.getElementById('publish-progress-box');
+    const statusText = document.getElementById('progress-status-text');
+    const barFill = document.getElementById('progress-bar-fill');
+    const alertBox = document.getElementById('result-alert-box');
+
+    if (btnLk) btnLk.disabled = true;
+    if (btnTg) btnTg.disabled = true;
+    alertBox.style.display = 'none';
+    progressBox.style.display = 'block';
+
+    const updateStep = (stepNum, text, percent) => {
+        statusText.textContent = text;
+        barFill.style.width = percent + '%';
+        document.querySelectorAll('.progress-steps .step').forEach((s, idx) => {
+            if (idx < stepNum) {
+                s.className = 'step active';
+            } else {
+                s.className = 'step';
+            }
+        });
+    };
+
+    updateStep(1, 'جاري رصد أحدث خبر تقني / فنتك / بروب تك...', 25);
+
+    const stepTimer = setTimeout(() => {
+        updateStep(2, 'جاري صياغة ملخص تيليجرام التقني والتحليل...', 50);
+    }, 4000);
+
+    const stepTimer2 = setTimeout(() => {
+        updateStep(3, 'جاري إنشاء إنفوجرافيك نانو بانانا برو مع شارة التوقيع...', 75);
+    }, 12000);
+
+    try {
+        const response = await fetch('/api/publish-telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        clearTimeout(stepTimer);
+        clearTimeout(stepTimer2);
+
+        const result = await response.json();
+        updateStep(4, 'تم الإرسال إلى تيليجرام بنجاح!', 100);
+
+        setTimeout(() => {
+            progressBox.style.display = 'none';
+            if (btnLk) btnLk.disabled = false;
+            if (btnTg) btnTg.disabled = false;
+            isPublishing = false;
+
+            if (result.success) {
+                alertBox.className = 'result-alert-box success';
+                alertBox.innerHTML = `
+                    <div style="font-weight: 700; margin-bottom: 6px;">✈️ تم النشر بنجاح على قناة تيليجرام!</div>
+                    <div style="font-size: 13px; margin-bottom: 8px;">📌 <strong>الخبر:</strong> ${result.article_title}</div>
+                    <div style="font-size: 12px;">✅ تم إرسال الإنفوجرافيك مع الشارة الشخصية والملخص التقني المعتمد.</div>
+                `;
+                alertBox.style.display = 'block';
+
+                refreshHistory();
+                refreshQueue();
+                pollSystemStatus();
+            } else {
+                alertBox.className = 'result-alert-box error';
+                alertBox.innerHTML = `
+                    <div style="font-weight: 700; margin-bottom: 4px;">⚠️ تنبيه أثناء النشر على تيليجرام:</div>
+                    <div style="font-size: 13px;">${result.error || 'تعذر إرسال البوست إلى تيليجرام'}</div>
+                `;
+                alertBox.style.display = 'block';
+            }
+        }, 1200);
+
+    } catch (err) {
+        clearTimeout(stepTimer);
+        clearTimeout(stepTimer2);
+        progressBox.style.display = 'none';
+        if (btnLk) btnLk.disabled = false;
+        if (btnTg) btnTg.disabled = false;
+        isPublishing = false;
+
+        alertBox.className = 'result-alert-box error';
+        alertBox.innerHTML = `<div>❌ حدث خطأ في الاتصال بالخادم: ${err.message}</div>`;
+        alertBox.style.display = 'block';
+    }
+}
+
 // 3. Schedule Management
 async function saveSchedule(times, enabled) {
     try {

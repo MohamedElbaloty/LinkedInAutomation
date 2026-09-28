@@ -273,80 +273,131 @@ class CommentGenerator:
         )
 
 
+def clean_news_title(title: str) -> str:
+    """
+    Cleans publisher attribution suffixes (e.g., ' - FF News', ' | TechCrunch', ' – Wamda')
+    WITHOUT destroying hyphenated compound words like 'AI-Native', 'Cross-Border', or 'Real-Time'.
+    """
+    if not title:
+        return ""
+    t = title.strip()
+    # Strip trailing publisher suffix separated by spaces: ' - Source', ' | Source', ' – Source', ' — Source'
+    t = re.sub(r"\s+[-|–—:]\s+[^-|–—:]+$", "", t).strip()
+    # If there is a trailing pipe '| Source'
+    t = re.sub(r"\s*\|\s*.*$", "", t).strip()
+    # Remove any trailing source names if enclosed in parentheses e.g. '(Khaleej Times)'
+    t = re.sub(r"\s*\((Khaleej Times|Argaam|Reuters|Bloomberg|FF News|TechCrunch|Wamda|Arabian Business)\)\s*$", "", t, flags=re.IGNORECASE).strip()
+    return t
+
+
 def extract_smart_linkedin_keywords(title: str, text: str = "") -> str:
     """
-    Extracts high-signal, focused entity and sector keywords (1-3 words max)
-    so that LinkedIn search reliably returns active, matching discussions
-    without the zero-results bug caused by long multi-word phrases.
+    Extracts high-signal, laser-focused entity and topic keywords (1-4 words)
+    specifically targeting the actual company, regulator, or event in the story,
+    so that LinkedIn search reliably returns discussions about THIS exact story.
+    Prevents generic category traps (e.g. 'FinTech Saudi') and avoids hyphen-breaking bugs.
     """
+    clean = clean_news_title(title)
+    combined = f"{clean} {text}".lower()
+
+    # 1. Curated high-precision entities (companies, regulators, banks, specific platforms)
     KNOWN_ENTITIES = [
-        ("ROSHN", ["roshn", "روشن"]),
-        ("PhonePe", ["phonepe"]),
-        ("SAMA", ["sama", "سما", "البنك المركزي السعودي", "البنك المركزي"]),
-        ("REGA", ["rega", "الهيئة العامة للعقار", "عقارات السعودية"]),
-        ("STC Pay", ["stc pay", "stcpay"]),
-        ("Urpay", ["urpay"]),
-        ("Tamara", ["tamara", "تمارا"]),
-        ("Tabby", ["tabby", "تابي"]),
-        ("Open Banking", ["open banking", "المصرفية المفتوحة"]),
-        ("PropTech", ["proptech", "بروبتيك", "التقنية العقارية"]),
-        ("FinTech", ["fintech", "فنتك", "التقنية المالية"]),
-        ("SARIE", ["sarie", "سريع"]),
-        ("Wafi", ["wafi", "وافي"]),
-        ("Aqar", ["aqar", "عقار"]),
-        ("Seamless", ["seamless"]),
-        ("Apple Pay", ["apple pay"]),
-        ("Mada", ["mada", "مدى"]),
+        ("ROSHN", [r"\broshn\b", r"\bروشن\b"]),
+        ("PhonePe", [r"\bphonepe\b"]),
+        ("SAMA", [r"\bsama\b", r"\bسما\b", r"\bالبنك المركزي السعودي\b", r"\bالبنك المركزي\b"]),
+        ("REGA", [r"\brega\b", r"\bالهيئة العامة للعقار\b"]),
+        ("STC Pay", [r"\bstc pay\b", r"\bstcpay\b"]),
+        ("Urpay", [r"\burpay\b"]),
+        ("Tamara", [r"\btamara\b", r"\bتمارا\b"]),
+        ("Tabby", [r"\btabby\b", r"\bتابي\b"]),
+        ("SARIE", [r"\bsarie\b", r"\bسريع\b"]),
+        ("Wafi", [r"\bwafi\b", r"\bوافي\b"]),
+        ("Aqar", [r"\baqar\b", r"\bعقار\b"]),
+        ("Seamless", [r"\bseamless\b"]),
+        ("Apple Pay", [r"\bapple pay\b"]),
+        ("Mada", [r"\bmada\b", r"\bمدى\b"]),
+        ("Seviora", [r"\bseviora\b"]),
+        ("First Abu Dhabi Bank", [r"\bfirst abu dhabi bank\b", r"\bfab\b"]),
+        ("Invest Qatar", [r"\binvest qatar\b"]),
+        ("Lean Technologies", [r"\blean technologies\b", r"\bleantech\b"]),
+        ("Geidea", [r"\bgeidea\b"]),
+        ("Islamic Fintech Mal", [r"\bmal\b.*\bfintech\b", r"\bfintech\b.*\bmal\b", r"\bislamic fintech mal\b", r"\bmal\b"]),
+        ("Emirates NBD", [r"\bemirates nbd\b"]),
+        ("Al Rajhi Bank", [r"\bal rajhi\b", r"\bمصرف الراجحي\b"]),
+        ("Saudi National Bank", [r"\bsaudi national bank\b", r"\bsnb\b", r"\bالبنك الأهلي\b"]),
+        ("Riyad Bank", [r"\briyad bank\b", r"\bبنك الرياض\b"]),
+        ("D360", [r"\bd360\b"]),
     ]
 
-    combined = f"{title} {text}".lower()
     matched = []
     for display_name, patterns in KNOWN_ENTITIES:
         for p in patterns:
-            if re.search(r"\b" + re.escape(p) + r"\b", combined, re.IGNORECASE) or (p in combined and len(p) >= 4):
+            if re.search(p, combined, re.IGNORECASE):
                 if display_name not in matched:
                     matched.append(display_name)
                 break
 
     if matched:
         if len(matched) == 1:
-            ent = matched[0]
-            if ent in ["ROSHN", "SAMA", "REGA", "SARIE", "PhonePe"]:
-                return ent
-            return f"{ent} Saudi"
-        else:
-            return " ".join(matched[:2])
+            return matched[0]
+        return " ".join(matched[:2])
 
-    # If no known entity, strip common stop words and pick 2 core words
-    clean = re.sub(r"[-|–—:,'\"].*$", "", title).strip()
+    # 2. Extract subject before primary action verb in business/tech headlines
+    action_verbs = r"\b(opens|launches|partners|signs|eyes|raises|secures|unveils|expands|acquires|introduces|announces|plans|enters|reports|accelerates|backs|funds|receives)\b"
+    match_verb = re.search(action_verbs, clean, re.IGNORECASE)
+    if match_verb and match_verb.start() > 3:
+        subject = clean[:match_verb.start()].strip()
+        subject = re.sub(r"^(the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
+        subject = re.sub(r"\s+(and|to|with|for)$", "", subject, flags=re.IGNORECASE).strip()
+        words = subject.split()
+        if 2 <= len(words) <= 5:
+            return subject
+        elif len(words) > 5:
+            return " ".join(words[:4])
+
+    # 3. Fallback: filter common stop words and take informative keywords
     stopwords = {
         "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "of", "with",
-        "is", "are", "was", "were", "will", "be", "receives", "approval", "expands",
-        "giant", "launches", "announces", "plans", "new", "first", "group", "company",
-        "market", "set", "report", "growth", "overseas", "closer", "moves",
-        "في", "من", "على", "إلى", "عن", "مع", "هذا", "هذه", "تم", "تعلن", "يطلق"
+        "is", "are", "was", "were", "will", "be", "new", "first", "says", "amid",
+        "about", "among", "under", "from", "by", "over", "into", "after", "today",
+        "set", "closer", "moves", "growth", "group", "company", "market",
+        "في", "من", "على", "إلى", "عن", "مع", "هذا", "هذه", "تم", "يطلق", "تعلن"
     }
-    words = [w for w in clean.split() if w.lower() not in stopwords]
-    return " ".join(words[:2]) if words else "Saudi Fintech Proptech"
+    words = [w for w in re.findall(r"[A-Za-z0-9\u0600-\u06FF\-]+", clean) if w.lower() not in stopwords]
+    return " ".join(words[:3]) if words else clean[:30]
 
 
-def build_linkedin_search_urls(keywords: str) -> Dict[str, str]:
+def build_linkedin_search_urls(keywords: str, title: str = "", source_url: str = "") -> Dict[str, str]:
     """
     Constructs reliable LinkedIn content search URLs:
-    1. search_url: Sorted by latest (date_posted), guaranteed to return posts without zero-results failure.
+    1. search_url: Sorted by latest (date_posted), searches for targeted keywords/entity.
     2. today_search_url: Strictly filtered to past 24 hours.
+    3. headline_search_url: Searches for the exact clean headline words.
+    4. url_search_url: Searches if anyone posted this exact URL on LinkedIn.
     """
-    clean_kw = keywords.strip() or "Saudi Fintech"
-    encoded = urllib.parse.quote_plus(clean_kw)
-    # URL 1: Newest posts chronologically (Today's posts at the top, guaranteed results)
-    search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded}&sortBy=%22date_posted%22"
-    # URL 2: Past 24 hours strict filter
-    today_search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded}&datePosted=%22past-24h%22&sortBy=%22date_posted%22"
-    return {
+    clean_kw = keywords.strip() or "FinTech"
+    encoded_kw = urllib.parse.quote_plus(clean_kw)
+    search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_kw}&sortBy=%22date_posted%22"
+    today_search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_kw}&datePosted=%22past-24h%22&sortBy=%22date_posted%22"
+
+    res = {
         "search_url": search_url,
         "today_search_url": today_search_url,
         "keyword": clean_kw,
     }
+
+    if title:
+        clean_t = clean_news_title(title)
+        words = clean_t.split()[:6]
+        if words:
+            encoded_title = urllib.parse.quote_plus(" ".join(words))
+            res["headline_search_url"] = f"https://www.linkedin.com/search/results/content/?keywords={encoded_title}&sortBy=%22date_posted%22"
+
+    if source_url and source_url.startswith("http"):
+        encoded_url = urllib.parse.quote_plus(source_url)
+        res["url_search_url"] = f"https://www.linkedin.com/search/results/content/?keywords={encoded_url}&sortBy=%22date_posted%22"
+
+    return res
 
 
 DISALLOWED_TOPIC_TERMS = {
@@ -386,7 +437,7 @@ def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
         if not is_valid_trending_topic(art.title, art.summary or ""):
             continue
 
-        clean_title = re.sub(r"[-|–—].*$", "", art.title).strip()
+        clean_title = clean_news_title(art.title)
         if clean_title.lower() in seen_titles:
             continue
         seen_titles.add(clean_title.lower())
@@ -401,7 +452,7 @@ def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
             continue
         seen_keywords.add(kw_key)
 
-        urls = build_linkedin_search_urls(smart_kw)
+        urls = build_linkedin_search_urls(smart_kw, title=art.title, source_url=art.link)
 
         topics.append({
             "title": art.title,
@@ -425,13 +476,13 @@ def get_today_trending_topics(limit: int = 6) -> List[Dict[str, any]]:
         for art in articles:
             if not is_valid_trending_topic(art.title, art.summary or ""):
                 continue
-            clean_title = re.sub(r"[-|–—].*$", "", art.title).strip()
+            clean_title = clean_news_title(art.title)
             if clean_title.lower() in seen_titles:
                 continue
             seen_titles.add(clean_title.lower())
             summary = (art.summary or art.title).replace("\n", " ").strip()
             smart_kw = extract_smart_linkedin_keywords(art.title, summary)
-            urls = build_linkedin_search_urls(smart_kw)
+            urls = build_linkedin_search_urls(smart_kw, title=art.title, source_url=art.link)
             topics.append({
                 "title": art.title,
                 "clean_title": clean_title,
@@ -541,9 +592,9 @@ def draft_comment_for_target(
                 resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
                 resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
         source_name = "LinkedIn Post"
-        if not search_keyword:
+        if not search_keyword or search_keyword in ["FinTech Saudi", "Saudi Fintech", "Saudi Fintech Proptech"]:
             search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_keyword)
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=resolved_url)
         linkedin_search_url = urls["search_url"]
         linkedin_search_today_url = urls["today_search_url"]
     elif resolved_title or (resolved_url and is_http_url) or resolved_text:
@@ -551,11 +602,13 @@ def draft_comment_for_target(
         source_url = resolved_url if is_http_url else None
         if not resolved_title:
             resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "") if resolved_text else "Saudi FinTech & PropTech Topic"
-        if not search_keyword:
+        if not search_keyword or search_keyword in ["FinTech Saudi", "Saudi Fintech", "Saudi Fintech Proptech"]:
             search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_keyword)
-        linkedin_search_url = linkedin_search_url or urls["search_url"]
-        linkedin_search_today_url = linkedin_search_today_url or urls["today_search_url"]
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=source_url or "")
+        if not linkedin_search_url or "keywords=FinTech+Saudi" in linkedin_search_url or "keywords=Saudi+Fintech" in linkedin_search_url:
+            linkedin_search_url = urls["search_url"]
+        if not linkedin_search_today_url or "keywords=FinTech+Saudi" in linkedin_search_today_url:
+            linkedin_search_today_url = urls["today_search_url"]
         linkedin_url = linkedin_search_url
         source_name = "Tech News & Industry"
     else:
@@ -565,8 +618,8 @@ def draft_comment_for_target(
         resolved_text = trending["post_text"]
         source_name = trending["source"]
         source_url = trending.get("source_url")
-        search_keyword = trending.get("search_keyword", "Saudi Fintech Proptech")
-        urls = build_linkedin_search_urls(search_keyword)
+        search_keyword = trending.get("search_keyword", "FinTech")
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=source_url or "")
         linkedin_url = urls["search_url"]
         linkedin_search_url = urls["search_url"]
         linkedin_search_today_url = urls["today_search_url"]
@@ -720,19 +773,20 @@ def draft_reshare_for_target(
                 resolved_title = f"منشور على LinkedIn ({target_urn or 'تفاعل مجتمعي'})"
                 resolved_text = "نقاش تنفيذي متخصص في قطاع التقنية المالية والتحول الرقمي والبنية التحتية السحابية."
         source_name = "LinkedIn Post"
-        if not search_keyword:
+        if not search_keyword or search_keyword in ["FinTech Saudi", "Saudi Fintech", "Saudi Fintech Proptech"]:
             search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_keyword)
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=resolved_url)
         linkedin_search_url = urls["search_url"]
     elif resolved_title or (resolved_url and is_http_url) or resolved_text:
         is_linkedin_post = False
         source_url = resolved_url if is_http_url else None
         if not resolved_title:
             resolved_title = resolved_text.split("\n")[0][:70] + ("..." if len(resolved_text) > 70 else "") if resolved_text else "Saudi FinTech & PropTech Topic"
-        if not search_keyword:
+        if not search_keyword or search_keyword in ["FinTech Saudi", "Saudi Fintech", "Saudi Fintech Proptech"]:
             search_keyword = extract_smart_linkedin_keywords(resolved_title, resolved_text)
-        urls = build_linkedin_search_urls(search_keyword)
-        linkedin_search_url = linkedin_search_url or urls["search_url"]
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=source_url or "")
+        if not linkedin_search_url or "keywords=FinTech+Saudi" in linkedin_search_url or "keywords=Saudi+Fintech" in linkedin_search_url:
+            linkedin_search_url = urls["search_url"]
         source_name = "Industry Source"
     else:
         # Discover today's top trending topic
@@ -741,8 +795,8 @@ def draft_reshare_for_target(
         resolved_text = trending["post_text"]
         source_name = trending["source"]
         source_url = trending.get("source_url")
-        search_keyword = trending.get("search_keyword", "Saudi Fintech")
-        urls = build_linkedin_search_urls(search_keyword)
+        search_keyword = trending.get("search_keyword", "FinTech")
+        urls = build_linkedin_search_urls(search_keyword, title=resolved_title, source_url=source_url or "")
         linkedin_search_url = urls["search_url"]
         is_linkedin_post = False
 

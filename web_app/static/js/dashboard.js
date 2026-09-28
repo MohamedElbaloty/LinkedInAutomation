@@ -596,12 +596,22 @@ async function triggerDraftComment(selectedTopic = null) {
             } else {
                 if (typeTag) typeTag.textContent = '📰 موضوع قطاعي مقترح للنقاش:';
                 if (urnElem) urnElem.textContent = 'استكشاف قطاعي ذكي';
+                if (sourceLink) {
+                    if (data.source_url) {
+                        sourceLink.href = data.source_url;
+                        sourceLink.style.display = 'inline-flex';
+                    } else {
+                        sourceLink.style.display = 'none';
+                    }
+                }
                 if (linkedinLink) {
                     linkedinLink.href = data.linkedin_search_url || data.linkedin_url || 'https://www.linkedin.com/search/results/content/';
                     linkedinLink.style.display = 'inline-flex';
                 }
                 if (linkedinLinkText) {
-                    linkedinLinkText.textContent = '🔍 استعراض منشورات النقاش على LinkedIn (الأحدث) ↗️';
+                    linkedinLinkText.textContent = data.search_keyword 
+                        ? `🔍 استعراض منشورات (${data.search_keyword}) على LinkedIn ↗️`
+                        : '🔍 استعراض منشورات هذا الخبر على LinkedIn (الأحدث) ↗️';
                 }
                 if (searchTodayLink) {
                     if (data.linkedin_search_today_url) {
@@ -617,14 +627,6 @@ async function triggerDraftComment(selectedTopic = null) {
                         searchKwBadge.style.display = 'inline-flex';
                     } else {
                         searchKwBadge.style.display = 'none';
-                    }
-                }
-                if (sourceLink) {
-                    if (data.source_url) {
-                        sourceLink.href = data.source_url;
-                        sourceLink.style.display = 'inline-flex';
-                    } else {
-                        sourceLink.style.display = 'none';
                     }
                 }
                 if (guidanceBox) guidanceBox.style.display = 'flex';
@@ -786,23 +788,36 @@ async function triggerDraftReshare(selectedTopic = null) {
             const searchKwBadge = document.getElementById('review-search-keyword-badge');
             const searchKwVal = document.getElementById('review-search-keyword-val');
 
-            if (typeTag) typeTag.textContent = '🚀 المنشور / المقال المراد إعادة مشاركته:';
-            if (urnElem) urnElem.textContent = data.post_urn || (data.target_url ? 'رابط مقال / منشور' : 'تريند قطاعي اليوم');
-
-            const viewLink = data.target_url || data.source_url || data.linkedin_search_url || 'https://www.linkedin.com/feed/';
-            if (linkedinLink) {
-                linkedinLink.href = viewLink;
-                linkedinLink.style.display = 'inline-flex';
-            }
-            if (linkedinLinkText) {
-                linkedinLinkText.textContent = data.target_url || data.source_url ? '🔗 فتح المقال / المنشور الأصلي ↗️' : '🔍 استعراض النقاشات على LinkedIn ↗️';
-            }
-            if (sourceLink) {
-                if (data.source_url) {
-                    sourceLink.href = data.source_url;
-                    sourceLink.style.display = 'inline-flex';
-                } else {
-                    sourceLink.style.display = 'none';
+            if (data.post_urn || (data.target_url && data.target_url.includes('linkedin.com'))) {
+                if (typeTag) typeTag.textContent = '🚀 منشور LinkedIn المراد إعادة مشاركته:';
+                if (urnElem) urnElem.textContent = data.post_urn || 'منشور رسمي على LinkedIn';
+                if (linkedinLink) {
+                    linkedinLink.href = data.target_url || data.post_url || 'https://www.linkedin.com/feed/';
+                    linkedinLink.style.display = 'inline-flex';
+                }
+                if (linkedinLinkText) {
+                    linkedinLinkText.textContent = '🔗 فتح المنشور على LinkedIn في تبويب جديد ↗️';
+                }
+                if (sourceLink) sourceLink.style.display = 'none';
+            } else {
+                if (typeTag) typeTag.textContent = '🚀 مقال إخباري مراد تحليله ومشاركته:';
+                if (urnElem) urnElem.textContent = 'مقال قطاعي موثوق';
+                if (sourceLink) {
+                    if (data.source_url) {
+                        sourceLink.href = data.source_url;
+                        sourceLink.style.display = 'inline-flex';
+                    } else {
+                        sourceLink.style.display = 'none';
+                    }
+                }
+                if (linkedinLink) {
+                    linkedinLink.href = data.linkedin_search_url || 'https://www.linkedin.com/search/results/content/';
+                    linkedinLink.style.display = 'inline-flex';
+                }
+                if (linkedinLinkText) {
+                    linkedinLinkText.textContent = data.search_keyword 
+                        ? `🔍 استعراض منشورات (${data.search_keyword}) على LinkedIn ↗️`
+                        : '🔍 استعراض منشورات هذا الخبر على LinkedIn ↗️';
                 }
             }
             if (searchTodayLink) searchTodayLink.style.display = 'none';
@@ -1005,9 +1020,13 @@ async function loadTrendingTodayTopics(force = false) {
                             💬 تعليق CTO
                         </button>
                         <button type="button" class="btn-topic-action btn-topic-reshare" onclick="selectTodayTopicIndex(${idx}, 'reshare')" title="إعادة مشاركة وتحليل تريند على حسابك">
-                            🚀 مشاركة وتحليل
+                            🚀 مشاركة
                         </button>
-                        <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض منشورات النقاش حول هذا الخبر بالذات على LinkedIn">
+                        ${topic.source_url ? `
+                        <a href="${topic.source_url}" target="_blank" class="btn-topic-action btn-topic-source" title="فتح الخبر الأصلي بموقع المصدر مباشرة ↗️">
+                            📰 الخبر ↗️
+                        </a>` : ''}
+                        <a href="${topic.linkedin_search_url}" target="_blank" class="btn-topic-action" title="استعراض منشورات النقاش حول (${escapeHtml(topic.search_keyword || 'هذا الخبر')}) على LinkedIn">
                             🔍 LinkedIn ↗️
                         </a>
                     </div>

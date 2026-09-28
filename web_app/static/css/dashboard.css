@@ -1361,6 +1361,18 @@ input:checked + .slider::before {
     color: #ffffff;
 }
 
+.btn-topic-action.btn-topic-source {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.btn-topic-action.btn-topic-source:hover {
+    background: rgba(245, 158, 11, 0.3);
+    color: #ffffff;
+    border-color: #fcd34d;
+}
+
 .badge-pill.pill-purple {
     background: rgba(168, 85, 247, 0.15);
     color: #c084fc;

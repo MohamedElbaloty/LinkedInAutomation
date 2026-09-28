@@ -79,15 +79,47 @@ async def _async_publish_to_linkedin(post_text: str, image_path: Optional[Path] 
                     await page.wait_for_timeout(2000)
 
             # 3. Enter post text
-            logger.info("Typing post copy into LinkedIn editor...")
+            from post_cleaner import clean_linkedin_post_text
+            clean_text = clean_linkedin_post_text(post_text)
+            logger.info("Typing formatted post copy into LinkedIn editor (Length: %d chars)...", len(clean_text))
             editor = page.locator('div[role="textbox"], div.ql-editor, div[contenteditable="true"]').first
             await editor.wait_for(state="visible", timeout=15000)
             await editor.click()
             await page.wait_for_timeout(500)
-            
-            # Fill post text
-            clean_text = post_text.strip()
-            await editor.fill(clean_text)
+
+            # Insert post copy while strictly preserving all paragraph breaks and numbered list enters
+            pasted = await editor.evaluate("""(el, text) => {
+                el.focus();
+                try {
+                    const dt = new DataTransfer();
+                    dt.setData('text/plain', text);
+                    const pasteEvent = new ClipboardEvent('paste', {
+                        bubbles: true,
+                        cancelable: true,
+                        clipboardData: dt
+                    });
+                    el.dispatchEvent(pasteEvent);
+                    return el.innerText.trim().length > 0;
+                } catch (e) {
+                    return false;
+                }
+            }""", clean_text)
+
+            # Fallback if clipboard paste didn't populate editor
+            current_val = (await editor.inner_text()).strip()
+            if not pasted or not current_val:
+                logger.info("Clipboard event fallback: inserting line by line to preserve layout...")
+                paragraphs = clean_text.split("\n\n")
+                for i, para in enumerate(paragraphs):
+                    if i > 0:
+                        await page.keyboard.press("Enter")
+                        await page.keyboard.press("Enter")
+                    lines = para.split("\n")
+                    for j, line in enumerate(lines):
+                        if j > 0:
+                            await page.keyboard.press("Shift+Enter")
+                        if line:
+                            await page.keyboard.insert_text(line)
             await page.wait_for_timeout(1000)
 
             # 4. Click 'Post'

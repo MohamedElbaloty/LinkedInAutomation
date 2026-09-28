@@ -66,23 +66,18 @@ def get_candidate_versions() -> List[str]:
 # Cached working version across requests
 _ACTIVE_LINKEDIN_VERSION: str = os.getenv("LINKEDIN_API_VERSION", "202608")
 
-# Regex to match reserved LinkedIn Little Text markup characters that cause silent post truncation:
-# \ | { } @ [ ] ( ) < > and isolated underscores (preserving hashtags like #Machine_Learning)
-LINKEDIN_LITTLE_TEXT_ESCAPE_RE = re.compile(r"([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))")
-
-
 def escape_linkedin_commentary(text: str) -> str:
     """
-    Escapes reserved 'Little Text' markup characters in LinkedIn commentary.
-    In LinkedIn /rest/posts, unescaped characters like (, ), [, ], {, }, <, >, |, @, \\
-    are parsed as entity mention or link markup. When invalid, LinkedIn silently truncates
-    the commentary text from that character onwards.
+    Cleanses and normalizes LinkedIn commentary text using post_cleaner.
+    Removes rogue escape backslashes, fixes literal /n or \\n, and ensures proper paragraph and list spacing.
+    In LinkedIn /rest/posts, standard commentary text should NEVER have backslashes prepended
+    to brackets or parentheses as they render literally in the user's feed.
     """
     if not text:
         return ""
-    # Normalize existing escapes to avoid double-escaping
-    cleaned = re.sub(r"\\([\\|{}@\[\]()<>]|(?<!\w)_(?!\w))", r"\1", str(text))
-    return LINKEDIN_LITTLE_TEXT_ESCAPE_RE.sub(r"\\\1", cleaned)
+    from post_cleaner import clean_linkedin_post_text
+    return clean_linkedin_post_text(text)
+
 
 
 def extract_urn_from_linkedin_url(url_or_urn: str) -> str:

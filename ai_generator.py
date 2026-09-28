@@ -127,17 +127,22 @@ class AIGenerator:
             "10. 'bullet_points': 2 to 3 concise, high-impact bullet points summarizing the actual news facts for the card.\n"
             "11. 'sector_tags': 3 short tags for the bottom of the card, e.g. ['السوق السعودي', 'المدفوعات الرقمية', 'Agentic Commerce'].\n"
             "12. 'theme_name': Choose dynamically from ['fintech_emerald', 'saudi_gold', 'ai_cyan', 'proptech_amber', 'deeptech_purple', 'bloomberg_orange', 'crimson_pulse', 'midnight_sapphire']. Select the most appropriate color theme for the sector.\n"
-            "13. 'layout_archetype': Choose dynamically from ['executive_broadsheet', 'bold_statement_hero', 'cyber_radar_cockpit', 'magazine_asymmetric_cover', 'split_left', 'split_right', 'hero_top'] to give each news card a radically unique visual identity.\n"
-            "14. 'image_prompt': A sophisticated, non-cliché English prompt for a prestigious 3D executive architectural visual representing the strategic core of the article (minimalist frosted glass prisms, polished anodized titanium blocks, flowing digital infrastructure ribbons, caustic light refractions, harmonious blended lighting, Dieter Rams/Apple aesthetic, NO cartoon robots, NO glowing brains, NO floating coins, NO text/letters).\n\n"
+            "13. 'layout_archetype': Choose dynamically from ['executive_broadsheet', 'bold_statement_hero', 'cyber_radar_cockpit', 'magazine_asymmetric_cover', 'split_left', 'split_right', 'hero_top'].\n"
+            "14. 'image_prompt': A strategic English summary of the visual concept.\n\n"
+            "STRICT FORMATTING AND TYPOGRAPHY CONSTRAINTS (MANDATORY):\n"
+            "- NEVER output escape backslashes before characters. Do NOT write \\( or \\) or \\[ or \\] or \\| or \\_ or \\*. Use normal parentheses and brackets.\n"
+            "- NEVER output literal '\\n' or '/n' text strings. Use true natural newlines.\n"
+            "- EVERY NUMBERED POINT (e.g. 1-, 2-, 3- or 1️⃣, 2️⃣, 3️⃣) and bullet point MUST start on a brand new line preceded by an empty blank line (\\n\\n). NEVER merge numbered points into a continuous run-on sentence.\n"
+            "- Paragraph Spacing: Separate all main sections and paragraphs with an empty blank line (\\n\\n) for maximum readability on mobile devices.\n\n"
             "LINKEDIN POST ARCHITECTURE (ARABIC WITH ENGLISH TERMS, 1500-2500 CHARACTERS):\n"
-            "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n"
-            "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n"
+            "- 🚀 The Hook: A bold, curiosity-igniting opening statement that cuts through hype. State what just fundamentally changed in AI, FinTech, or PropTech.\n\n"
+            "- 🌍 Strategic Context & Regional Alignment: Connect the news to the broader landscape—especially how it impacts the Saudi market (Vision 2030, SAMA sandbox, CMA, REGA / الهيئة العامة للعقار) and the GCC digital economy.\n\n"
             "- 🔬 Architectural & Operational Breakdown: 4 to 5 structured, high-value bullet points analyzing the mechanics under the hood "
-            "(e.g., open banking APIs, digital escrow, property valuation AI, tokenization & fractional ownership, test-time compute, inference latency, credit scoring models, payments orchestration). Explain concrete metrics, protocols, or unit economics.\n"
-            "- 💼 Engineering & Business Implications: What this means practically for software teams, product leaders, and fintech/proptech founders building in Saudi Arabia and the Gulf.\n"
-            "- 💬 Provocative Discussion Question (CTA): A strategic technical or business trade-off question directed at tech leaders, founders, and investors to drive high-caliber debate in the comments.\n"
+            "(e.g., open banking APIs, digital escrow, property valuation AI, tokenization & fractional ownership, test-time compute, inference latency, credit scoring models, payments orchestration). Each point on its own separate line with double enter.\n\n"
+            "- 💼 Engineering & Business Implications: What this means practically for software teams, product leaders, and fintech/proptech founders building in Saudi Arabia and the Gulf.\n\n"
+            "- 💬 Provocative Discussion Question (CTA): A strategic technical or business trade-off question directed at tech leaders, founders, and investors to drive high-caliber debate in the comments.\n\n"
             "- 📌 Source Attribution: Clearly state the news source at the end:\n"
-            "  '📌 المصدر: [اسم المصدر - Source Name] | [عنوان الخبر المرجعي]'\n"
+            "  '📌 المصدر: [اسم المصدر - Source Name] | [عنوان الخبر المرجعي]'\n\n"
             "- 🏷️ Hashtags: Include targeted hashtags for Saudi, GCC, FinTech, and PropTech:\n"
             "  #فنتك #بروب_تك #التقنية_العقارية #التقنية_المالية #السعودية #رؤية_السعودية_2030 #Fintech #Proptech #SaudiTech #GCC #AI #SoftwareEngineering\n"
         )
@@ -180,6 +185,24 @@ class AIGenerator:
                 raw_text = response.text.strip()
                 data = json.loads(raw_text)
                 result = GenerationResult(**data)
+
+                # Clean and normalize post text to eliminate rogue characters, slashes, or unbroken lists
+                from post_cleaner import clean_linkedin_post_text
+                result.linkedin_post = clean_linkedin_post_text(result.linkedin_post)
+                result.telegram_caption = clean_linkedin_post_text(result.telegram_caption)
+
+                # Synthesize tailored, story-specific visual prompt for Nano Banana Pro via SmartPromptEngine
+                try:
+                    from smart_prompt_engine import SmartPromptEngine
+                    engine = SmartPromptEngine()
+                    smart_prompt_res = engine.generate_smart_prompt(article, result.category_badge)
+                    result.image_prompt = smart_prompt_res.prompt_for_nano_banana_pro
+                    logger.info("Assigned dynamic Nano Banana Pro prompt: %s...", result.image_prompt[:90])
+                except Exception as pe_err:
+                    logger.warning("Smart prompt engine fallback: %s", pe_err)
+                    if not result.image_prompt:
+                        result.image_prompt = f"16:9 executive editorial technology infographic for LinkedIn covering {article.title}. Minimalist clean modern tech design."
+
                 logger.info("Successfully generated LinkedIn post and image prompt with %s.", model_name)
                 return result
 
@@ -316,7 +339,7 @@ class AIGenerator:
     def generate_image(self, prompt: str, article_id: str, output_dir: Path = IMAGES_DIR) -> Path:
         """
         Generates an ultra high-quality studio technical visual using Google's Nano Banana Pro model
-        either via Google Flow Pro direct session or Google GenAI API fallback.
+        either via Google Flow Pro direct session or high-fidelity alternatives.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{article_id[:16]}.jpg"
@@ -324,124 +347,83 @@ class AIGenerator:
 
         from image_watermark import stamp_author_branding
 
-        # 1. First Priority: Google GenAI API Image models (Official Nano Banana Pro / Imagen 3)
-        candidate_models = [
-            "gemini-3-pro-image",
-            "gemini-3.1-flash-image",
-            "gemini-2.5-flash-image",
-            self.image_model,
-        ]
-        candidate_models = list(dict.fromkeys(candidate_models))
+        # 1. First Priority: Direct Google Flow Pro automation with true 'Nano Banana Pro 🍌'
+        try:
+            logger.info("Priority 1: Generating visual via Google Flow Pro with 'Nano Banana Pro 🍌'...")
+            raw_path = self._generate_gflow_image(prompt, target_path)
+            if raw_path.exists() and raw_path.stat().st_size > 15000:
+                logger.info("Successfully generated and acquired visual via Google Flow Nano Banana Pro: %s", raw_path)
+                return stamp_author_branding(raw_path)
+        except Exception as e:
+            logger.warning("Google Flow Nano Banana Pro generation failed or unavailable: %s", str(e)[:150])
 
+        # 2. Second Priority: FLUX.1 High-Fidelity 16:9 Generator
+        try:
+            logger.info("Priority 2: Generating cinematic AI visual with FLUX.1...")
+            raw_path = self._generate_flux_image(prompt, target_path)
+            if raw_path.exists() and raw_path.stat().st_size > 10000:
+                return stamp_author_branding(raw_path)
+        except Exception as e:
+            logger.warning("FLUX.1 generation encountered an issue (%s).", str(e)[:150])
+
+        # 3. Third Priority: Google GenAI Imagen 3 API
+        candidate_models = ["imagen-3.0-generate-002", "imagen-3.0-fast-generate-001", self.image_model]
+        candidate_models = list(dict.fromkeys(candidate_models))
         for model_name in candidate_models:
-            logger.info("Generating studio visual with Nano Banana Pro model: %s...", model_name)
+            logger.info("Priority 3: Attempting Imagen API with model: %s...", model_name)
             try:
-                response = self.client.models.generate_content(
+                result = self.client.models.generate_images(
                     model=model_name,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["IMAGE"],
+                    prompt=prompt,
+                    config=dict(
+                        number_of_images=1,
+                        aspect_ratio="16:9",
+                        output_mime_type="image/jpeg",
                     ),
                 )
-
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
-                            img = Image.open(io.BytesIO(part.inline_data.data))
-                            img.save(target_path, format="JPEG", quality=95)
-                            logger.info("Google Studio image successfully saved to %s (size: %s)", target_path, img.size)
-                            return stamp_author_branding(target_path)
-            except Exception as e:
-                logger.warning("Generation with %s encountered an issue: %s", model_name, str(e)[:150])
+                if result.generated_images:
+                    img_bytes = result.generated_images[0].image.image_bytes
+                    with open(target_path, "wb") as f:
+                        f.write(img_bytes)
+                    logger.info("Imagen API image successfully saved to %s", target_path)
+                    return stamp_author_branding(target_path)
+            except Exception as img_err:
+                logger.debug("Imagen API model %s failed: %s", model_name, str(img_err)[:120])
                 continue
 
-        # 2. Second Priority: Direct Google Flow Pro automation
-        try:
-            raw_path = self._generate_gflow_image(prompt, target_path)
-            return stamp_author_branding(raw_path)
-        except Exception as e:
-            logger.warning("Google Flow Nano Banana Pro generation failed: %s", str(e)[:150])
-
-        # 3. Third Priority: FLUX.1
-        try:
-            raw_path = self._generate_flux_image(prompt, target_path)
-            return stamp_author_branding(raw_path)
-        except Exception as e:
-            logger.warning("FLUX.1 generation encountered an issue (%s). Falling back to graphic.", str(e))
-            raw_path = self._generate_fallback_image(prompt, target_path)
-            return stamp_author_branding(raw_path)
+        # 4. Fourth Priority: High-resolution editorial card graphic
+        logger.warning("All visual generators failed. Falling back to editorial graphic layout.")
+        raw_path = self._generate_fallback_image(prompt, target_path)
+        return stamp_author_branding(raw_path)
 
     def generate_news_card(self, content_result: GenerationResult, article: Article, output_dir: Path = IMAGES_DIR) -> Path:
         """
-        Renders a Bloomberg/Forbes Middle East-grade editorial news card with Arabic typography,
-        numerical stat callouts, sector badges, and executive author signature.
-        Seamlessly integrates 3D Banana Pro backdrops behind frosted glass panels.
+        Renders an editorial news card or generates the Nano Banana Pro visual.
         """
-        output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{article.id[:16]}.jpg"
-        target_path = output_dir / filename
-
-        # 1. Attempt to generate or reuse a pristine 3D executive visual backdrop via gemini-3-pro-image (Nano Banana Pro)
-        bg_visual_path = None
         try:
-            bg_target = output_dir / f"bg_{article.id[:14]}.jpg"
-            if not bg_target.exists():
-                prompt_3d = self.build_smart_tech_prompt(article, content_result)
-                logger.info("Synthesizing smart 3D visual backdrop via Nano Banana Pro (gemini-3-pro-image)...")
-                response = self.client.models.generate_content(
-                    model="gemini-3-pro-image",
-                    contents=prompt_3d,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["IMAGE"],
-                    ),
-                )
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
-                            img_3d = Image.open(io.BytesIO(part.inline_data.data))
-                            img_3d.save(bg_target, format="JPEG", quality=92)
-                            bg_visual_path = bg_target
-                            logger.info("Nano Banana Pro 3D visual backdrop generated: %s", bg_target)
-                            break
-            else:
-                bg_visual_path = bg_target
-        except Exception as e:
-            logger.info("3D visual backdrop skipped/fallback (%s). Rendering pure blended mesh gradient.", str(e)[:120])
-
-        try:
-            from news_card_designer import render_editorial_news_card
-            return render_editorial_news_card(
-                headline_line1=getattr(content_result, "card_headline", None) or article.title,
-                headline_line2=getattr(content_result, "card_sub_headline", "") or "",
-                metric_value=getattr(content_result, "metric_value", "") or "GROWTH",
-                metric_label=getattr(content_result, "metric_label", "") or "مؤشر قطاعي رائد",
-                metric_sub=getattr(content_result, "metric_sub", "") or (article.source or "تحليل استراتيجي"),
-                category_badge=getattr(content_result, "category_badge", "") or "التقنية المالية والتمويل | FINTECH",
-                event_badge=getattr(content_result, "event_badge", "") or "تطور تقني جديد • MARKET UPDATE",
-                bullet_points=getattr(content_result, "bullet_points", None) or [article.title],
-                sector_tags=getattr(content_result, "sector_tags", None) or ["السوق السعودي", "الابتكار الرقمي", "رؤية 2030"],
-                source_name=article.source,
-                theme_name=getattr(content_result, "theme_name", "auto") or "auto",
-                layout_archetype=getattr(content_result, "layout_archetype", "auto") or "auto",
-                target_path=target_path,
-                background_image_path=bg_visual_path,
-            )
-        except Exception as e:
-            logger.error("Failed to render executive news card: %s. Falling back to diffusion visual.", e, exc_info=True)
             return self.generate_image(content_result.image_prompt or article.title, article.id, output_dir)
-
+        except Exception as e:
+            logger.error("Failed to generate Banana Pro visual: %s. Falling back to fallback layout.", e)
+            target_path = output_dir / f"{article.id[:16]}.jpg"
+            return self._generate_fallback_image(article.title, target_path)
 
 
 def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, any]:
     """
-    Convenience orchestrator for generating post copy, news card metadata, and generating the executive news card.
+    Convenience orchestrator for generating post copy, smart prompt, and generating the Nano Banana Pro visual.
     Returns a dictionary containing post text, hook, card info, and image file path (or None if skip_image=True).
     """
     generator = AIGenerator()
     content_result = generator.generate_post_and_prompt(article)
     image_path = None
     if not skip_image:
-        image_path = generator.generate_news_card(content_result, article)
+        # Generate the authentic, high-impact Nano Banana Pro visual
+        prompt_to_use = content_result.image_prompt or content_result.card_headline or article.title
+        try:
+            image_path = generator.generate_image(prompt_to_use, article.id)
+        except Exception as img_exc:
+            logger.error("Failed to generate primary visual: %s. Using editorial card fallback.", img_exc)
+            image_path = generator.generate_news_card(content_result, article)
 
     return {
         "article": article,
@@ -449,7 +431,7 @@ def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, an
         "post_text": content_result.linkedin_post,
         "linkedin_post": content_result.linkedin_post,
         "telegram_caption": content_result.telegram_caption,
-        "visual_archetype": "executive_news_card",
+        "visual_archetype": getattr(content_result, "layout_archetype", "nano_banana_pro_editorial"),
         "image_prompt": content_result.image_prompt or content_result.card_headline,
         "image_path": image_path,
         "card_metadata": {

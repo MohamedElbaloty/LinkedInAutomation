@@ -40,26 +40,49 @@ async def _async_generate_banana_pro(prompt: str, target_path: Path) -> Path:
             await comp.wait_for(state="visible", timeout=35000)
             logger.info("Flow project composer ready in dedicated workspace!")
 
-            # Ensure model is set to Nano Banana (Image mode)
-            # Check bottom controls for Video / فيديو pill
-            buttons = await page.locator('.bottom-controls button').all()
-            for b in buttons:
-                t = (await b.inner_text()).replace("\n", " ").strip()
-                if "video" in t.lower() or "فيديو" in t:
-                    logger.info("Detected Video mode (%s). Switching to Nano Banana Image Mode 🍌...", t)
-                    await b.click()
-                    await page.wait_for_timeout(1200)
+            # Ensure model is set specifically to Nano Banana Pro (Image mode, 16:9)
+            pill = page.locator('.bottom-controls button').first
+            if await pill.count() > 0 and await pill.is_visible():
+                pill_text = (await pill.inner_text()).replace("\n", " ").strip()
+                logger.info("Current Flow model pill: '%s'", pill_text)
+                if "banana pro" not in pill_text.lower():
+                    logger.info("Switching Google Flow to Nano Banana Pro 🍌...")
+                    await pill.click()
+                    await page.wait_for_timeout(1000)
+
+                    # Ensure Image tab is active
                     img_tab = page.locator('button:has-text("Image"), button:has-text("صورة"), [role="tab"]:has-text("Image"), [role="tab"]:has-text("صورة")').first
                     if await img_tab.is_visible():
                         await img_tab.click()
                         await page.wait_for_timeout(800)
+
+                    # Click model selector dropdown
+                    nb_btn = page.locator('button:has-text("Nano Banana"), div[role="button"]:has-text("Nano Banana"), [role="combobox"]').first
+                    if await nb_btn.is_visible():
+                        await nb_btn.click()
+                        await page.wait_for_timeout(800)
+                        pro_opt = page.locator('text="Nano Banana Pro", [role="option"]:has-text("Nano Banana Pro"), button:has-text("Nano Banana Pro")').first
+                        if await pro_opt.is_visible():
+                            await pro_opt.click()
+                            await page.wait_for_timeout(800)
+                        else:
+                            # Fallback check all menu items
+                            options = await page.locator('[role="option"], mat-option, .mat-mdc-menu-item').all()
+                            for opt in options:
+                                otxt = (await opt.inner_text()).strip()
+                                if "banana pro" in otxt.lower():
+                                    await opt.click()
+                                    await page.wait_for_timeout(800)
+                                    break
+
+                    # Ensure 16:9 ratio
                     r169 = page.locator('button:has-text("16:9"), [role="radio"]:has-text("16:9")').first
                     if await r169.is_visible():
                         await r169.click()
                         await page.wait_for_timeout(500)
+
                     await page.keyboard.press("Escape")
                     await page.wait_for_timeout(800)
-                    break
 
             # Record existing image URLs in this project
             existing_imgs = await page.locator('img[src*="/asb/"], img[src*="http"]').all()

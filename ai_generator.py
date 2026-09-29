@@ -347,49 +347,71 @@ class AIGenerator:
 
         from image_watermark import stamp_author_branding
 
-        # 1. First Priority: Direct Google Flow Pro automation with true 'Nano Banana Pro 🍌'
+        # 1. First Priority: Google GenAI API Image models
+        candidate_models = [
+            "gemini-3-pro-image",
+            "gemini-3.1-flash-image",
+            "imagen-3.0-generate-002",
+            "imagen-3.0-fast-generate-001",
+            self.image_model,
+        ]
+        candidate_models = list(dict.fromkeys(candidate_models))
+        for model_name in candidate_models:
+            logger.info("Priority 1: Attempting Google GenAI Image API with model: %s...", model_name)
+            try:
+                if "gemini" in model_name:
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_modalities=["IMAGE"],
+                        ),
+                    )
+                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                        for part in response.candidates[0].content.parts:
+                            if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
+                                img = Image.open(io.BytesIO(part.inline_data.data))
+                                img.save(target_path, format="JPEG", quality=95)
+                                logger.info("Google Studio image successfully saved to %s (size: %s)", target_path, img.size)
+                                return stamp_author_branding(target_path)
+                else:
+                    result = self.client.models.generate_images(
+                        model=model_name,
+                        prompt=prompt,
+                        config=dict(
+                            number_of_images=1,
+                            aspect_ratio="16:9",
+                            output_mime_type="image/jpeg",
+                        ),
+                    )
+                    if result.generated_images:
+                        img_bytes = result.generated_images[0].image.image_bytes
+                        with open(target_path, "wb") as f:
+                            f.write(img_bytes)
+                        logger.info("Imagen API image successfully saved to %s", target_path)
+                        return stamp_author_branding(target_path)
+            except Exception as img_err:
+                logger.debug("Image model %s failed: %s", model_name, str(img_err)[:120])
+                continue
+
+        # 2. Second Priority: Direct Google Flow Pro automation
         try:
-            logger.info("Priority 1: Generating visual via Google Flow Pro with 'Nano Banana Pro 🍌'...")
+            logger.info("Priority 2: Generating visual via Google Flow Pro with 'Nano Banana Pro 🍌'...")
             raw_path = self._generate_gflow_image(prompt, target_path)
             if raw_path.exists() and raw_path.stat().st_size > 15000:
-                logger.info("Successfully generated and acquired visual via Google Flow Nano Banana Pro: %s", raw_path)
+                logger.info("Successfully generated visual via Google Flow: %s", raw_path)
                 return stamp_author_branding(raw_path)
         except Exception as e:
-            logger.warning("Google Flow Nano Banana Pro generation failed or unavailable: %s", str(e)[:150])
+            logger.warning("Google Flow generation unavailable: %s", str(e)[:150])
 
-        # 2. Second Priority: FLUX.1 High-Fidelity 16:9 Generator
+        # 3. Third Priority: FLUX.1 High-Fidelity 16:9 Generator
         try:
-            logger.info("Priority 2: Generating cinematic AI visual with FLUX.1...")
+            logger.info("Priority 3: Generating visual with FLUX.1...")
             raw_path = self._generate_flux_image(prompt, target_path)
             if raw_path.exists() and raw_path.stat().st_size > 10000:
                 return stamp_author_branding(raw_path)
         except Exception as e:
             logger.warning("FLUX.1 generation encountered an issue (%s).", str(e)[:150])
-
-        # 3. Third Priority: Google GenAI Imagen 3 API
-        candidate_models = ["imagen-3.0-generate-002", "imagen-3.0-fast-generate-001", self.image_model]
-        candidate_models = list(dict.fromkeys(candidate_models))
-        for model_name in candidate_models:
-            logger.info("Priority 3: Attempting Imagen API with model: %s...", model_name)
-            try:
-                result = self.client.models.generate_images(
-                    model=model_name,
-                    prompt=prompt,
-                    config=dict(
-                        number_of_images=1,
-                        aspect_ratio="16:9",
-                        output_mime_type="image/jpeg",
-                    ),
-                )
-                if result.generated_images:
-                    img_bytes = result.generated_images[0].image.image_bytes
-                    with open(target_path, "wb") as f:
-                        f.write(img_bytes)
-                    logger.info("Imagen API image successfully saved to %s", target_path)
-                    return stamp_author_branding(target_path)
-            except Exception as img_err:
-                logger.debug("Imagen API model %s failed: %s", model_name, str(img_err)[:120])
-                continue
 
         # 4. Fourth Priority: High-resolution editorial card graphic
         logger.warning("All visual generators failed. Falling back to editorial graphic layout.")
@@ -398,32 +420,78 @@ class AIGenerator:
 
     def generate_news_card(self, content_result: GenerationResult, article: Article, output_dir: Path = IMAGES_DIR) -> Path:
         """
-        Renders an editorial news card or generates the Nano Banana Pro visual.
+        Renders a Bloomberg/Forbes Middle East-grade editorial news card with Arabic typography,
+        numerical stat callouts, sector badges, and executive author signature.
+        Seamlessly integrates 3D visual backdrops behind frosted glass panels or rich blended mesh.
         """
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{article.id[:16]}.jpg"
+        target_path = output_dir / filename
+
+        # 1. Attempt to generate or reuse a pristine 3D executive visual backdrop via gemini-3-pro-image
+        bg_visual_path = None
         try:
-            return self.generate_image(content_result.image_prompt or article.title, article.id, output_dir)
+            bg_target = output_dir / f"bg_{article.id[:14]}.jpg"
+            if not bg_target.exists():
+                prompt_3d = self.build_smart_tech_prompt(article, content_result)
+                logger.info("Synthesizing smart 3D visual backdrop via Gemini Image API...")
+                response = self.client.models.generate_content(
+                    model="gemini-3-pro-image",
+                    contents=prompt_3d,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                    ),
+                )
+                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, "inline_data") and part.inline_data and part.inline_data.data:
+                            img_3d = Image.open(io.BytesIO(part.inline_data.data))
+                            img_3d.save(bg_target, format="JPEG", quality=92)
+                            bg_visual_path = bg_target
+                            logger.info("Nano Banana Pro 3D visual backdrop generated: %s", bg_target)
+                            break
+            else:
+                bg_visual_path = bg_target
         except Exception as e:
-            logger.error("Failed to generate Banana Pro visual: %s. Falling back to fallback layout.", e)
-            target_path = output_dir / f"{article.id[:16]}.jpg"
-            return self._generate_fallback_image(article.title, target_path)
+            logger.info("3D visual backdrop skipped (%s). Rendering pure blended mesh gradient.", str(e)[:120])
+
+        try:
+            from news_card_designer import render_editorial_news_card
+            return render_editorial_news_card(
+                headline_line1=getattr(content_result, "card_headline", None) or article.title,
+                headline_line2=getattr(content_result, "card_sub_headline", "") or "",
+                metric_value=getattr(content_result, "metric_value", "") or "GROWTH",
+                metric_label=getattr(content_result, "metric_label", "") or "مؤشر قطاعي رائد",
+                metric_sub=getattr(content_result, "metric_sub", "") or (article.source or "تحليل استراتيجي"),
+                category_badge=getattr(content_result, "category_badge", "") or "التقنية المالية والتمويل | FINTECH",
+                event_badge=getattr(content_result, "event_badge", "") or "تطور تقني جديد • MARKET UPDATE",
+                bullet_points=getattr(content_result, "bullet_points", None) or [article.title],
+                sector_tags=getattr(content_result, "sector_tags", None) or ["#FinTech", "#PropTech", "#Saudi_Arabia"],
+                source_name=article.source,
+                theme_name=getattr(content_result, "theme_name", "auto") or "auto",
+                layout_archetype=getattr(content_result, "layout_archetype", "auto") or "auto",
+                target_path=target_path,
+                background_image_path=bg_visual_path,
+            )
+        except Exception as e:
+            logger.error("Failed to render executive news card: %s. Falling back to default canvas.", e, exc_info=True)
+            from news_card_designer import render_editorial_news_card
+            return render_editorial_news_card(
+                headline_line1=article.title,
+                target_path=target_path,
+            )
 
 
 def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, any]:
     """
-    Convenience orchestrator for generating post copy, smart prompt, and generating the Nano Banana Pro visual.
+    Convenience orchestrator for generating post copy, news card metadata, and generating the executive news card.
     Returns a dictionary containing post text, hook, card info, and image file path (or None if skip_image=True).
     """
     generator = AIGenerator()
     content_result = generator.generate_post_and_prompt(article)
     image_path = None
     if not skip_image:
-        # Generate the authentic, high-impact Nano Banana Pro visual
-        prompt_to_use = content_result.image_prompt or content_result.card_headline or article.title
-        try:
-            image_path = generator.generate_image(prompt_to_use, article.id)
-        except Exception as img_exc:
-            logger.error("Failed to generate primary visual: %s. Using editorial card fallback.", img_exc)
-            image_path = generator.generate_news_card(content_result, article)
+        image_path = generator.generate_news_card(content_result, article)
 
     return {
         "article": article,
@@ -431,7 +499,7 @@ def create_ai_bundle(article: Article, skip_image: bool = False) -> Dict[str, an
         "post_text": content_result.linkedin_post,
         "linkedin_post": content_result.linkedin_post,
         "telegram_caption": content_result.telegram_caption,
-        "visual_archetype": getattr(content_result, "layout_archetype", "nano_banana_pro_editorial"),
+        "visual_archetype": getattr(content_result, "layout_archetype", "executive_news_card"),
         "image_prompt": content_result.image_prompt or content_result.card_headline,
         "image_path": image_path,
         "card_metadata": {
